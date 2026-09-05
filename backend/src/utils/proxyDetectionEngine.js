@@ -1,4 +1,5 @@
 const { getDistanceInMeters, getTravelSpeedKmh } = require('./geoUtils');
+const { getPreviousWorkday } = require('../config/scheduleConfig');
 
 const THRESHOLDS = {
   PROXIMITY_METERS: 1,
@@ -14,20 +15,8 @@ function degradedTrustScoreCap(currentScore, severity) {
   return Math.min(current, caps[severity]);
 }
 
-function getPreviousWorkday(date) {
-  const d = new Date(date);
-  d.setUTCHours(0, 0, 0, 0);
-  d.setUTCDate(d.getUTCDate() - 1);
-  // Sunday -> Friday
-  if (d.getUTCDay() === 0) {
-    d.setUTCDate(d.getUTCDate() - 2);
-  }
-  // Saturday -> Friday
-  else if (d.getUTCDay() === 6) {
-    d.setUTCDate(d.getUTCDate() - 1);
-  }
-  return d;
-}
+// getPreviousWorkday imported from ../config/scheduleConfig
+
 
 function getDateMinusDays(date, days) {
   const d = new Date(date);

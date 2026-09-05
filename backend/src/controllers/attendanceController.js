@@ -1,4 +1,5 @@
 const prisma = require('../config/db');
+const { isDefaultOffDay } = require('../config/scheduleConfig');
 const { dispatchWebhook } = require('../utils/webhookDispatcher');
 const { sendNotification } = require('../utils/notificationEngine');
 const { evaluateSpatialTrust } = require('../utils/spatialTrustEngine');
@@ -729,9 +730,20 @@ const getAttendanceReport = async (req, res) => {
   }
 };
 
+const spectrumCache = new Map();
+const SPECTRUM_CACHE_TTL = 15000;
+
 const getWeeklySpectrum = async (req, res) => {
   try {
-    const tenantId = req.user.tenantId;
+    const tenantId = req.user.tenantId || 'global';
+    const targetDateParam = req.query.date || 'current';
+    const cacheKey = `${tenantId}_${targetDateParam}`;
+    const now = Date.now();
+    const cached = spectrumCache.get(cacheKey);
+    if (cached && (now - cached.timestamp < SPECTRUM_CACHE_TTL)) {
+      return res.json(cached.data);
+    }
+
     const isFounder = req.user.roleDefinition?.level === 0;
     
     // Parse target date for the week (defaults to now)
@@ -809,16 +821,17 @@ const getWeeklySpectrum = async (req, res) => {
     for (let i = 0; i < 7; i++) {
       const dayDate = new Date(startOfWeek);
       dayDate.setDate(startOfWeek.getDate() + i);
-      const dayTime = dayDate.getTime();
-      const isPast = dayTime < realNowTime;
-      const isToday = dayTime === realNowTime;
-      const isFuture = dayTime > realNowTime;
-      const isWeekend = i === 0 || i === 6;
+      const isWeekend = isDefaultOffDay(dayDate); // Sunday is weekly off; Saturday is normal working day
 
       // Create a local Date string for accurate comparison (YYYY-MM-DD)
       const targetDateStr = dayDate.getFullYear() + '-' + 
         String(dayDate.getMonth() + 1).padStart(2, '0') + '-' + 
         String(dayDate.getDate()).padStart(2, '0');
+
+      // Compare strings, NOT timestamps — avoids timezone shift making isToday always false
+      const isToday = targetDateStr === realNowStr;
+      const isPast = targetDateStr < realNowStr;
+      const isFuture = targetDateStr > realNowStr;
 
       let presentCount = 0;
       let halfDayCount = 0;
@@ -902,10 +915,9 @@ const getWeeklySpectrum = async (req, res) => {
       });
     }
 
-    res.json({
-      totalEmployees,
-      weekData
-    });
+    const responsePayload = { totalEmployees, weekData };
+    spectrumCache.set(cacheKey, { timestamp: Date.now(), data: responsePayload });
+    res.json(responsePayload);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

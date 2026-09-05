@@ -279,6 +279,7 @@ function App() {
           {/* Public routes */}
           <Route path="/" element={<Landing />} />
           <Route path="/careers/*" element={<Careers />} />
+          <Route path="/jobs/*" element={<Careers />} />
           <Route path="/signup" element={<UniversalAuth defaultIsSignUp={true} />} />
           <Route path="/login" element={<UniversalAuth defaultIsSignUp={false} />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />

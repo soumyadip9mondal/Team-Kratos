@@ -102,9 +102,9 @@ export function getEmployeeStatus(emp, targetDateStr = null) {
 
   // No active record found
   const dayOfWeek = now.getDay();
-  const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+  const isOffDay = dayOfWeek === 0; // Sunday is Weekly Off Day; Saturday is Working Day
 
-  if (isWeekend) {
+  if (isOffDay) {
     return { text: 'Off Day', variant: 'gray' };
   }
 

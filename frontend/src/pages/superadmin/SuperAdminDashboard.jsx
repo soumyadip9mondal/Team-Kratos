@@ -64,7 +64,7 @@ const SuperAdminDashboard = () => {
       {/* Super Admin Top Navigation */}
       <header className="h-16 bg-white border-b border-[#EAE7E0] flex items-center justify-between px-6 shrink-0 z-40 sticky top-0">
         <div className="flex items-center gap-3">
-          <img src="/Crew.png" alt="Crew HR" className="h-8 object-contain" />
+          <img src="/crew-new.png" alt="Crew HR" className="h-8 object-contain" />
           <div className="h-4 w-px bg-[#EAE7E0] mx-2"></div>
           <span className="font-serif font-bold text-[#1F2B4D] tracking-tight">Platform Admin</span>
         </div>

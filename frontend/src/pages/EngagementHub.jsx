@@ -26,6 +26,9 @@ import {
 import { CardSkeleton, ListSkeleton } from '../components/ui/Skeleton';
 import { formatDistanceToNow, format } from 'date-fns';
 import { io } from 'socket.io-client';
+import { CommunicationReviewDialog } from '../components/communication/CommunicationReviewDialog';
+import { IrisPostAnalysisModal } from '../components/communication/IrisPostAnalysisModal';
+import { getCapabilities } from '../lib/communicationStressApi';
 
 const CATEGORY_STYLES = {
   Urgent: { bg: 'bg-rose-50/90 text-rose-700 border-rose-200/90', icon: AlertTriangle },
@@ -51,7 +54,19 @@ const EngagementHub = ({ user }) => {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
+  const [isReviewDialogOpen, setIsReviewDialogOpen] = useState(false);
+  const [canStressTest, setCanStressTest] = useState(false);
+
+  const [selectedAnnouncementForAnalysis, setSelectedAnnouncementForAnalysis] = useState(null);
+  const [isIrisAnalysisModalOpen, setIsIrisAnalysisModalOpen] = useState(false);
+
   const isAdmin = hasPermission(user, 'manage_organization');
+
+  useEffect(() => {
+    getCapabilities()
+      .then(res => setCanStressTest(res.canStressTest))
+      .catch(() => setCanStressTest(false));
+  }, []);
 
   const fetchAnnouncements = async () => {
     try {
@@ -86,8 +101,13 @@ const EngagementHub = ({ user }) => {
   useEffect(() => {
     const load = async () => {
       setLoading(true);
-      await Promise.all([fetchAnnouncements(), fetchUserPreference()]);
-      setLoading(false);
+      try {
+        await Promise.allSettled([fetchAnnouncements(), fetchUserPreference()]);
+      } catch (err) {
+        console.error('Error loading Engagement Hub data:', err);
+      } finally {
+        setLoading(false);
+      }
     };
     load();
 
@@ -286,6 +306,16 @@ const EngagementHub = ({ user }) => {
         </div>
 
         <div className="flex items-center gap-2 w-full sm:w-auto">
+          {!isAdmin && canStressTest && (
+            <Button 
+              onClick={() => setIsReviewDialogOpen(true)}
+              variant="ghost"
+              className="flex-1 sm:flex-none justify-center whitespace-nowrap gap-1.5 font-display font-bold text-[#1F2B4D] hover:bg-amber-50 border border-amber-300 text-[11px] sm:text-xs rounded-xl px-2.5 sm:px-3.5 py-2 transition-all bg-amber-50/50 shadow-xs"
+            >
+              <ShieldCheck size={14} className="text-amber-700 shrink-0" />
+              <span className="text-[#1F2B4D]">Review a Draft</span>
+            </Button>
+          )}
           {isAdmin && (
             <>
               <Button 
@@ -399,29 +429,44 @@ const EngagementHub = ({ user }) => {
                       )}
                     </div>
 
-                    {/* Birthday Wish Interaction */}
-                    {isBirthday && (
-                      <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
-                        {wishes.length > 0 && (
-                          <span className="text-[11px] font-medium text-[#6B655C]">
-                            {hasWished ? `You and ${wishes.length - 1} others wished` : `${wishes.length} wishes`}
-                          </span>
-                        )}
-                        <Button
-                          size="sm"
-                          disabled={hasWished || wishingId === ann.id}
-                          onClick={() => handleWish(ann.id)}
-                          className={`gap-1.5 font-display font-bold text-xs rounded-xl transition-all px-3.5 py-1.5 ${
-                            hasWished 
-                              ? 'bg-rose-50 text-rose-700 border border-rose-200 cursor-not-allowed'
-                              : 'bg-[#FDF2F8] hover:bg-[#FCE7F3] text-[#9D174D] border border-[#FBCFE8] shadow-xs hover:scale-[1.02] active:scale-95'
-                          }`}
-                        >
-                          <Heart size={13} className={hasWished ? 'fill-rose-700' : ''} />
-                          {hasWished ? 'Wished' : 'Send Wish'}
-                        </Button>
-                      </div>
-                    )}
+                    <div className="flex items-center gap-2 w-full sm:w-auto justify-end flex-wrap">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          setSelectedAnnouncementForAnalysis(ann);
+                          setIsIrisAnalysisModalOpen(true);
+                        }}
+                        className="bg-indigo-50 hover:bg-indigo-100/90 text-indigo-800 border border-indigo-200 font-display font-bold text-xs px-3 py-1.5 rounded-xl shadow-xs transition-all flex items-center gap-1.5 active:scale-95 shrink-0"
+                      >
+                        <Sparkles size={13} className="text-indigo-600 shrink-0" />
+                        <span>Analyze with Iris AI</span>
+                      </Button>
+
+                      {/* Birthday Wish Interaction */}
+                      {isBirthday && (
+                        <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
+                          {wishes.length > 0 && (
+                            <span className="text-[11px] font-medium text-[#6B655C]">
+                              {hasWished ? `You and ${wishes.length - 1} others wished` : `${wishes.length} wishes`}
+                            </span>
+                          )}
+                          <Button
+                            size="sm"
+                            disabled={hasWished || wishingId === ann.id}
+                            onClick={() => handleWish(ann.id)}
+                            className={`gap-1.5 font-display font-bold text-xs rounded-xl transition-all px-3.5 py-1.5 ${
+                              hasWished 
+                                ? 'bg-rose-50 text-rose-700 border border-rose-200 cursor-not-allowed'
+                                : 'bg-[#FDF2F8] hover:bg-[#FCE7F3] text-[#9D174D] border border-[#FBCFE8] shadow-xs hover:scale-[1.02] active:scale-95'
+                            }`}
+                          >
+                            <Heart size={13} className={hasWished ? 'fill-rose-700' : ''} />
+                            {hasWished ? 'Wished' : 'Send Wish'}
+                          </Button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               );
@@ -511,18 +556,47 @@ const EngagementHub = ({ user }) => {
                 />
               </div>
 
-              <div className="flex justify-end gap-2.5 pt-4 border-t border-[#EAE7E0]">
-                <Button type="button" variant="ghost" onClick={() => setIsModalOpen(false)} className="text-[#6B655C] font-display font-bold text-xs rounded-xl px-4 py-2 hover:bg-[#F4F1EA]">
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={submitting} className="bg-[#F0F3F9] hover:bg-[#E2E8F0] text-[#1F2B4D] border border-[#CBD5E1] font-display font-bold text-xs px-5 py-2 rounded-xl shadow-xs transition-all hover:scale-[1.02] active:scale-95">
-                  {submitting ? 'Broadcasting...' : 'Broadcast'}
-                </Button>
+              <div className="flex items-center justify-between pt-4 border-t border-[#EAE7E0]">
+                {canStressTest && (
+                  <Button 
+                    type="button" 
+                    variant="ghost"
+                    onClick={() => setIsReviewDialogOpen(true)}
+                    className="bg-amber-50 hover:bg-amber-100/90 text-amber-950 border border-amber-300 font-display font-bold text-xs px-3.5 py-2 rounded-xl shadow-xs transition-all flex items-center gap-1.5 active:scale-95"
+                  >
+                    <ShieldCheck size={15} className="text-amber-700 shrink-0" />
+                    <span className="text-amber-950 font-bold">Stress-test</span>
+                  </Button>
+                )}
+                <div className="flex items-center gap-2">
+                  <Button type="button" variant="ghost" onClick={() => setIsModalOpen(false)} className="text-[#6B655C] font-display font-bold text-xs rounded-xl px-4 py-2 hover:bg-[#F4F1EA]">
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={submitting} className="bg-[#F0F3F9] hover:bg-[#E2E8F0] text-[#1F2B4D] border border-[#CBD5E1] font-display font-bold text-xs px-5 py-2 rounded-xl shadow-xs transition-all hover:scale-[1.02] active:scale-95">
+                    {submitting ? 'Broadcasting...' : 'Broadcast'}
+                  </Button>
+                </div>
               </div>
             </form>
           </div>
         </div>
       )}
+
+      {/* Stress-Test Review Dialog */}
+      <CommunicationReviewDialog
+        isOpen={isReviewDialogOpen}
+        onClose={() => setIsReviewDialogOpen(false)}
+        initialDraft={formData}
+        onApplyRewrite={(rewriteText) => setFormData({ ...formData, message: rewriteText })}
+        readOnly={!isAdmin}
+      />
+
+      {/* Employee Iris Post Analysis Modal */}
+      <IrisPostAnalysisModal
+        isOpen={isIrisAnalysisModalOpen}
+        onClose={() => setIsIrisAnalysisModalOpen(false)}
+        announcement={selectedAnnouncementForAnalysis}
+      />
     </div>
   );
 };

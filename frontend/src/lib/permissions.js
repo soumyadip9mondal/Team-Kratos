@@ -29,6 +29,10 @@ export const hasPermission = (user, permKey) => {
     case 'manage_benefits':    return l <= 2;
     case 'manage_organization':return l <= 1;
     case 'manage_helpdesk':    return l <= 1;
+    case 'communication_stress_test':           return l <= 2;
+    case 'view_all_communication_stress_tests': return l <= 1;
+    case 'manage_communication_personas':       return l <= 1;
+    case 'view_communication_trends':           return l <= 1;
     default: return false;
   }
 };

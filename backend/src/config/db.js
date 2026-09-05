@@ -2,27 +2,69 @@ const { PrismaClient } = require('@prisma/client');
 const tenantStorage = require('../middleware/tenantContext');
 const { generateAuditHash } = require('../utils/auditHashing');
 
-// Build a DATABASE_URL with connection pool params that prevent idle connection kills
-// from serverless/managed Postgres providers (Neon, Supabase, etc.)
-const buildDatabaseUrl = () => {
-  const base = process.env.DATABASE_URL || '';
-  if (!base) return base;
-  try {
-    const url = new URL(base);
-    // Reduce pool size & add keepalive to prevent idle connection resets (OS error 10054 / P1017)
-    if (!url.searchParams.has('connection_limit'))  url.searchParams.set('connection_limit', '5');
-    if (!url.searchParams.has('pool_timeout'))       url.searchParams.set('pool_timeout', '30');
-    if (!url.searchParams.has('connect_timeout'))    url.searchParams.set('connect_timeout', '30');
-    return url.toString();
-  } catch {
-    return base;
+// Use DATABASE_URL exactly as configured in .env — all Neon/PgBouncer params set there directly
+const buildDatabaseUrl = () => process.env.DATABASE_URL || '';
+
+// ── Neon Cold-Start Retry Logic ──────────────────────────────────────────
+// Neon free-tier suspends compute after inactivity. The first query after a
+// cold start fails immediately with "Can't reach database server". This
+// wrapper transparently retries transient connection errors up to 4 times
+// with exponential back-off, covering the ~3-5s Neon wake-up window.
+const isTransientError = (err) => {
+  const msg = err?.message || '';
+  return (
+    msg.includes("Can't reach database server") ||
+    msg.includes('Server has closed the connection') ||
+    msg.includes('Connection reset') ||
+    msg.includes('ECONNREFUSED') ||
+    msg.includes('ECONNRESET') ||
+    msg.includes('Timed out fetching a new connection') ||
+    msg.includes('connection pool') ||
+    err?.code === 'P1001' ||
+    err?.code === 'P1002' ||
+    err?.code === 'P1008' ||
+    err?.code === 'P1017'
+  );
+};
+
+// maxRetries=7, delayMs=2000, factor=2x → total window: 2+4+8+16+32+64+128 = ~254s
+// Neon free-tier cold starts take 3-30s; this covers even the worst case comfortably.
+const withRetry = async (fn, maxRetries = 7, delayMs = 2000) => {
+  let lastErr;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastErr = err;
+      if (attempt < maxRetries && isTransientError(err)) {
+        const wait = Math.min(delayMs * Math.pow(2, attempt), 30000); // cap at 30s per attempt
+        console.warn(`[DB] Transient connection error (attempt ${attempt + 1}/${maxRetries}), retrying in ${Math.round(wait / 1000)}s...`);
+        await new Promise(r => setTimeout(r, wait));
+      } else {
+        throw err;
+      }
+    }
   }
+  throw lastErr;
 };
 
 const basePrisma = new PrismaClient({
   log: ['error'],
   datasourceUrl: buildDatabaseUrl(),
 });
+
+// Warm up the connection immediately on startup (non-blocking)
+// withRetry will keep re-attempting until Neon's compute wakes (~3-30s on cold start)
+withRetry(() => basePrisma.$queryRaw`SELECT 1`)
+  .then(() => {
+    console.log('[DB] Connection warmed up successfully.');
+    // Keep-alive: ping every 4 min to prevent Neon free-tier compute suspension (suspends after 5 min idle)
+    setInterval(() => {
+      basePrisma.$queryRaw`SELECT 1`
+        .catch(() => {}); // silent — if it fails, withRetry on next real query will recover
+    }, 4 * 60 * 1000);
+  })
+  .catch(err => console.warn('[DB] Warm-up ping exhausted retries (non-fatal):', err.message));
 
 const prisma = basePrisma.$extends({
   query: {
@@ -122,5 +164,6 @@ const prisma = basePrisma.$extends({
 
 // Export the secured client as default, and attach basePrisma for internal auth routes
 prisma.basePrisma = basePrisma;
+prisma.withRetry = withRetry;
 
 module.exports = prisma;

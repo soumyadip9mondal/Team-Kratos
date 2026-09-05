@@ -42,7 +42,7 @@ const CreateEmployee = () => {
       location: atsData.location || atsData.city || '',
       entityId: '',
       officeId: storedUser.officeId || '',
-      workingDaysPerWeek: 5,
+      workingDaysPerWeek: 6,
       breakTimeHrs: 1.0
     };
   });
@@ -159,7 +159,7 @@ const CreateEmployee = () => {
         ...prev,
         email: '', displayName: '', department: '', 
         phone: '', jobPosition: '', gender: 'Male', location: '', entityId: '', officeId: '',
-        workingDaysPerWeek: 5, breakTimeHrs: 1.0 
+        workingDaysPerWeek: 6, breakTimeHrs: 1.0 
       }));
     } catch (err) {
       setError(err.message);

@@ -1,4 +1,6 @@
 const prisma = require('../config/db');
+const { withRetry } = prisma;
+const auth = require('../middleware/auth');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 const { dispatchWebhook } = require('../utils/webhookDispatcher');
@@ -186,15 +188,16 @@ const login = async (req, res) => {
     }
 
     // Try finding by email first, then by employeeId
-    let user = await prisma.basePrisma.user.findUnique({ 
+    // withRetry handles Neon cold-start: compute takes ~3-5s to wake up
+    let user = await withRetry(() => prisma.basePrisma.user.findUnique({ 
       where: { email: identifier },
       include: { roleDefinition: true }
-    });
+    }));
     if (!user) {
-      user = await prisma.basePrisma.user.findFirst({ 
+      user = await withRetry(() => prisma.basePrisma.user.findFirst({ 
         where: { employeeId: identifier },
         include: { roleDefinition: true }
-      });
+      }));
     }
 
     if (!user) {
@@ -504,6 +507,9 @@ const registerCompany = async (req, res) => {
         }
       });
 
+      const { seed: seedCommunicationReview } = require('../services/communicationPersonaSeeder');
+      await seedCommunicationReview(tx, tenant.id);
+
       await tx.leavePolicy.create({
         data: {
           tenantId: tenant.id,
@@ -588,6 +594,10 @@ const verifyOTP = async (req, res) => {
       },
       include: { roleDefinition: true }
     });
+
+    if (auth.clearAuthUserCache) {
+      auth.clearAuthUserCache(req.user.id);
+    }
 
     // Send welcome email ONLY once — on their very first successful verification
     if (isFirstVerification) {

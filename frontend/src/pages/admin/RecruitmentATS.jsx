@@ -346,11 +346,12 @@ const RecruitmentATS = () => {
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <a 
-              href={`/careers/${JSON.parse(localStorage.getItem('user'))?.tenantId}`} 
+              href="/jobs" 
               target="_blank" rel="noreferrer" 
               className="group flex items-center bg-white border border-[#EAE7E0] text-[#1D1B16] pl-3 pr-1 py-1 rounded-full text-[12px] font-bold shadow-sm hover:shadow-md hover:-translate-y-0.5 active:scale-[0.97] active:translate-y-0 transition-all duration-300"
+              title="Open public jobs portal"
             >
-              <span className="mr-2">Careers</span>
+              <span className="mr-2">Public Jobs Portal</span>
               <div className="w-6 h-6 rounded-full bg-[#FAF9F6] border border-[#EAE7E0] flex items-center justify-center group-hover:bg-[#1D1B16] group-hover:text-white transition-colors duration-300">
                 <ExternalLink size={12} strokeWidth={2.5} className="group-hover:-translate-y-[1px] group-hover:translate-x-[1px] transition-transform duration-300" />
               </div>
@@ -380,7 +381,7 @@ const RecruitmentATS = () => {
         </div>
 
         {/* Compact Job Selector */}
-        <div className="cinematic-selector mb-8 flex items-center gap-3">
+        <div className="cinematic-selector mb-8 flex flex-wrap items-center gap-3">
           <div className="relative group min-w-[260px]">
             <select 
               className="appearance-none w-full bg-white border border-[#EAE7E0] text-[#1D1B16] text-[13px] font-bold tracking-tight rounded-lg px-3 py-2 pr-8 focus:ring-2 focus:ring-[#1D1B16] focus:outline-none transition-shadow shadow-sm hover:shadow-md cursor-pointer"
@@ -397,6 +398,18 @@ const RecruitmentATS = () => {
             </div>
           </div>
           
+          {selectedJob && (
+            <a 
+              href={`/jobs/job/${selectedJob}`}
+              target="_blank" rel="noreferrer"
+              className="px-3.5 py-2 bg-white border border-[#EAE7E0] text-[#1F2B4D] rounded-full text-[12px] font-bold hover:bg-[#FAF9F6] hover:border-[#1F2B4D]/30 hover:-translate-y-0.5 active:scale-[0.97] transition-all duration-300 shadow-sm flex items-center gap-1.5"
+              title="Open public posting for selected job"
+            >
+              <span>View Job Posting</span>
+              <ExternalLink size={12} />
+            </a>
+          )}
+
           {selectedJob && jobs.find(j => j.id === selectedJob)?.status === 'Open' && (
             <button 
               onClick={handleCloseJob}

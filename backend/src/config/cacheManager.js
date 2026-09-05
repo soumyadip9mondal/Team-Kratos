@@ -88,5 +88,6 @@ const delCache = async (key) => {
 module.exports = {
   getCache,
   setCache,
-  delCache
+  delCache,
+  getRedisHealth: () => ({ available: isRedisAvailable, client: redisClient }),
 };

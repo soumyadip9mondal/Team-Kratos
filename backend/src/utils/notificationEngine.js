@@ -436,31 +436,29 @@ const sendNotification = async (params) => {
       }
     }
 
-    // Dispatch Email only if we have valid subject and message content
+    // Dispatch Email asynchronously in background (non-blocking) so HTTP API calls return instantly
     if (user.email && subject && message) {
-      const isSent = await sendEmail(user.email, subject, message, attachmentBase64, attachmentName);
+      sendEmail(user.email, subject, message, attachmentBase64, attachmentName)
+        .then(isSent => {
+          if (isSent && tenantId) {
+            prisma.basePrisma.auditLog.create({
+              data: {
+                actorId: userId,
+                action: 'NOTIFICATION_SENT',
+                tenantId,
+                details: `Sent ${type} via EMAIL. Subject: ${subject}`
+              }
+            }).catch(auditError => {
+              console.warn(`[NOTIFICATION AUDIT WARNING] Could not write audit log for ${type}:`, auditError.message);
+            });
+          }
+        })
+        .catch(err => console.error(`[NOTIFICATION ERROR] Email dispatch failed for ${type}:`, err.message));
 
-      // If employee has specified a personal email address, also dispatch a copy to their personal email inbox
       if (user.personalEmail && user.personalEmail.trim().length > 0 && user.personalEmail.toLowerCase() !== user.email.toLowerCase()) {
         sendEmail(user.personalEmail, subject, message, attachmentBase64, attachmentName)
           .then(() => console.log(`[NOTIFICATION] Dual-sent ${type} notification to personal email: ${user.personalEmail}`))
           .catch(err => console.error(`[NOTIFICATION WARNING] Could not send copy to personal email (${user.personalEmail}):`, err.message));
-      }
-
-      // Record in Audit Trail
-      if (isSent && tenantId) {
-        try {
-          await prisma.basePrisma.auditLog.create({
-            data: {
-              actorId: userId,
-              action: 'NOTIFICATION_SENT',
-              tenantId,
-              details: `Sent ${type} via EMAIL. Subject: ${subject}`
-            }
-          });
-        } catch (auditError) {
-          console.warn(`[NOTIFICATION AUDIT WARNING] Could not write audit log for ${type}:`, auditError.message);
-        }
       }
     } else {
       console.log(`[NOTIFICATION SKIPPED] Suppressed email dispatch for type=${type} (no email subject/body)`);

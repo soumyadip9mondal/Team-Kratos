@@ -60,7 +60,7 @@ export default function ResetPassword() {
         <nav className="w-full max-w-5xl mx-auto flex items-center justify-between py-3.5 px-4 sm:px-6 rounded-2xl bg-white border border-[#EAE7E0] shadow-[0_1px_2px_rgba(29,27,22,0.04)]">
           <Link to="/" className="flex items-center gap-3 group">
             <div className="p-2 rounded-xl bg-[#F4F1EA] border border-[#EAE7E0] group-hover:border-[#1F2B4D]/30 transition-all">
-              <img src="/Crew.png" alt="Crew HR Logo" className="h-7 w-auto object-contain" />
+              <img src="/crew-new.png" alt="Crew HR Logo" className="h-9 w-auto object-contain" />
             </div>
             <div>
               <span className="font-heading font-extrabold text-[#1D1B16] text-base tracking-tight block leading-none">Crew HRMS</span>

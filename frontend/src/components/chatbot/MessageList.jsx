@@ -1,10 +1,11 @@
 import React, { useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Bot } from 'lucide-react';
+import { Bot, Paperclip } from 'lucide-react';
 import InlineIrisCard from './InlineIrisCard';
+import IrisDocumentVerificationCard from './IrisDocumentVerificationCard';
 
-export default function MessageList({ messages, isLoading }) {
+export default function MessageList({ messages, isLoading, onSendMessage }) {
   const endRef = useRef(null);
 
   useEffect(() => {
@@ -52,14 +53,29 @@ export default function MessageList({ messages, isLoading }) {
             ) : m.role === 'model' ? (
               <div className="prose prose-sm prose-slate max-w-none prose-p:leading-relaxed prose-pre:bg-slate-800 prose-pre:text-slate-100 prose-a:text-indigo-600 hover:prose-a:text-indigo-500 prose-strong:text-slate-900 prose-headings:text-slate-900">
                 {(() => {
-                  const parts = m.content.split(/(\[IRIS_ACTION_CARD:[a-zA-Z0-9-]+\])/g);
+                  const parts = m.content.split(/(\[IRIS_ACTION_CARD:[a-zA-Z0-9-]+\]|\[IRIS_DOCUMENT_CARD:.*?\])/g);
                   const cards = [];
+                  const docCards = [];
                   const texts = [];
                   
                   parts.forEach((part, i) => {
                     if (part.startsWith('[IRIS_ACTION_CARD:')) {
                       const taskId = part.replace('[IRIS_ACTION_CARD:', '').replace(']', '');
                       cards.push(<InlineIrisCard key={`card-${i}`} taskId={taskId} />);
+                    } else if (part.startsWith('[IRIS_DOCUMENT_CARD:')) {
+                      try {
+                        const jsonStr = part.replace('[IRIS_DOCUMENT_CARD:', '').slice(0, -1);
+                        const docData = JSON.parse(jsonStr);
+                        docCards.push(
+                          <IrisDocumentVerificationCard
+                            key={`doc-card-${i}`}
+                            documentData={docData}
+                            onActionTriggered={onSendMessage}
+                          />
+                        );
+                      } catch (err) {
+                        console.error('Failed to parse document card json', err);
+                      }
                     } else {
                       texts.push(
                         <ReactMarkdown key={`text-${i}`} remarkPlugins={[remarkGfm]}>
@@ -72,13 +88,39 @@ export default function MessageList({ messages, isLoading }) {
                   return (
                     <div className="flex flex-col">
                       <div>{texts}</div>
+                      {docCards.length > 0 && <div className="mt-4">{docCards}</div>}
                       {cards.length > 0 && <div className="mt-4">{cards}</div>}
                     </div>
                   );
                 })()}
               </div>
             ) : (
-              <div className="whitespace-pre-wrap text-[14.5px] leading-relaxed font-medium">{m.content}</div>
+              <div className="whitespace-pre-wrap text-[14.5px] leading-relaxed font-medium">
+                {(() => {
+                  let textContent = m.content || '';
+                  let fileName = m.attachedFile?.name;
+
+                  if (textContent.startsWith('[ATTACHED_FILE:')) {
+                    const match = textContent.match(/^\[ATTACHED_FILE:(.*?)\](?:\n(.*))?$/s);
+                    if (match) {
+                      fileName = fileName || match[1];
+                      textContent = match[2] || '';
+                    }
+                  }
+
+                  return (
+                    <div className="flex flex-col items-start gap-1.5">
+                      {fileName && (
+                        <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-white/15 border border-white/25 rounded-xl text-xs font-semibold text-white shadow-xs">
+                          <Paperclip size={13} className="text-indigo-200" />
+                          <span>{fileName}</span>
+                        </div>
+                      )}
+                      {textContent ? <div>{textContent}</div> : null}
+                    </div>
+                  );
+                })()}
+              </div>
             )}
           </div>
         </div>

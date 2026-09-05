@@ -108,12 +108,13 @@ const Sidebar = ({ user, onCloseMobile }) => {
       </button>
 
       {/* Company Logo area */}
-      <div className={`flex items-center justify-center ${isCollapsed ? 'pt-2 pb-3 px-0' : 'pt-0 pb-4 px-4'} mb-0 w-full overflow-hidden`}>
+      <div className={`flex items-center justify-center ${isCollapsed ? 'py-2 px-1 mb-2' : 'pt-3 pb-4 px-3 mb-4'} w-full overflow-hidden shrink-0`}>
         <img
-          src="/Crew.png"
+          src="/crew-new.png"
           alt="Crew HR Logo"
-          className={`h-auto object-contain brightness-0 invert opacity-90 transition-all ${isCollapsed ? 'w-7 h-7 object-cover object-left' : 'w-full'
-            }`}
+          className={`object-contain mix-blend-screen opacity-95 transition-all ${
+            isCollapsed ? 'h-7 w-auto max-w-[44px]' : 'h-14 sm:h-16 w-auto max-w-[190px]'
+          }`}
         />
       </div>
 

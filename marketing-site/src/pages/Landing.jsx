@@ -1,5 +1,5 @@
 import React from 'react';
-import { motion } from 'framer-motion';
+import { motion, useScroll, useTransform, useSpring } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { 
   Building2, ArrowRight, ShieldCheck, Zap, 
@@ -7,7 +7,20 @@ import {
 } from 'lucide-react';
 
 export default function Landing() {
-  const springConfig = { type: 'spring', stiffness: 260, damping: 20 };
+  const { scrollY } = useScroll();
+
+  // Continuously map real-time scrollY (0px to 200px) to navbar dimensions
+  const rawWidth = useTransform(scrollY, [0, 200], ['64rem', '44rem']);
+  const rawPaddingY = useTransform(scrollY, [0, 200], ['0.75rem', '0.45rem']);
+  const rawPaddingX = useTransform(scrollY, [0, 200], ['1.25rem', '0.875rem']);
+  const rawLogoHeight = useTransform(scrollY, [0, 200], ['3.25rem', '2.25rem']);
+
+  // Apply fluid spring physics for buttery smooth motion (Outcrowd style)
+  const smoothWidth = useSpring(rawWidth, { stiffness: 280, damping: 28 });
+  const smoothPaddingY = useSpring(rawPaddingY, { stiffness: 280, damping: 28 });
+  const smoothPaddingX = useSpring(rawPaddingX, { stiffness: 280, damping: 28 });
+  const smoothLogoHeight = useSpring(rawLogoHeight, { stiffness: 280, damping: 28 });
+
   const cubicTransition = { duration: 0.8, ease: [0.32, 0.72, 0, 1] };
 
   // Scroll reveal variants
@@ -27,24 +40,34 @@ export default function Landing() {
       {/* Noise Texture Overlay */}
       <div className="pointer-events-none fixed inset-0 z-50 opacity-[0.03] mix-blend-multiply bg-[url('https://grainy-gradients.vercel.app/noise.svg')]"></div>
 
-      {/* Floating Island Navbar */}
-      <div className="fixed top-0 left-0 right-0 z-40 px-4 pt-6">
+      {/* Floating Island Navbar (Outcrowd Real-Time Scroll Linked) */}
+      <div className="fixed top-0 left-0 right-0 z-40 px-4 pt-4 md:pt-6 flex justify-center pointer-events-none">
         <motion.nav 
           initial={{ y: -50, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
-          transition={cubicTransition}
-          className="mx-auto max-w-5xl bg-white/80 backdrop-blur-xl border border-[#EAE7E0] rounded-full px-5 py-3 flex items-center justify-between shadow-[0_4px_24px_-8px_rgba(29,27,22,0.1)]"
+          transition={{ duration: 0.8, ease: [0.32, 0.72, 0, 1] }}
+          style={{ 
+            width: smoothWidth,
+            maxWidth: '94vw',
+            paddingTop: smoothPaddingY,
+            paddingBottom: smoothPaddingY,
+            paddingLeft: smoothPaddingX,
+            paddingRight: smoothPaddingX,
+          }}
+          className="pointer-events-auto bg-white/85 backdrop-blur-2xl border border-[#EAE7E0] rounded-full flex items-center justify-between shadow-[0_8px_32px_-8px_rgba(29,27,22,0.12)]"
         >
           <Link to="/" className="flex items-center gap-3 group px-2">
-            <div className="w-8 h-8 rounded-full bg-[#0B1121] flex items-center justify-center text-white shadow-inner group-hover:scale-105 transition-transform duration-500">
-              <Building2 size={16} strokeWidth={2.5} />
-            </div>
-            <span className="font-serif font-bold text-[#0B1121] tracking-tight">Crew HRMS</span>
+            <motion.img 
+              src="/crew-new.png" 
+              alt="Crew HRMS Logo" 
+              style={{ height: smoothLogoHeight }}
+              className="w-auto object-contain drop-shadow-xs group-hover:scale-105 transition-transform duration-300" 
+            />
           </Link>
 
           <div className="flex items-center gap-3">
             <span className="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#F4F1EA] text-[#6B655C] border border-[#EAE7E0] text-[10px] font-bold uppercase tracking-widest">
-              <Crown size={12} className="text-[#B5793A]" /> Enterprise
+              <Crown size={12} className="text-[#1F2B4D]" /> Enterprise
             </span>
             <Link 
               to="/login" 
@@ -72,16 +95,16 @@ export default function Landing() {
             className="flex flex-col items-start w-full"
           >
             <motion.div variants={revealUp} className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#F4F1EA] text-[#0B1121] border border-[#EAE7E0] text-[10px] font-bold uppercase tracking-[0.2em] mb-8">
-              <Sparkles size={14} className="text-[#B5793A]" />
+              <Sparkles size={14} className="text-[#1F2B4D]" />
               The Executive Standard
             </motion.div>
 
             <motion.h1 variants={revealUp} className="text-5xl md:text-6xl lg:text-7xl font-serif font-bold text-[#0B1121] leading-[1.05] tracking-tight mb-8">
               Architect the <br className="hidden md:block"/>
               future of your <br className="hidden md:block"/>
-              <span className="relative inline-block text-[#B5793A]">
+              <span className="relative inline-block text-[#1F2B4D] italic">
                 workforce.
-                <span className="absolute bottom-2 left-0 w-full h-[1px] bg-[#B5793A]/30"></span>
+                <span className="absolute bottom-2 left-0 w-full h-[2px] bg-[#1F2B4D]/30"></span>
               </span>
             </motion.h1>
 
@@ -132,7 +155,7 @@ export default function Landing() {
                 <div className="space-y-4">
                   {[
                     { title: 'Facial Recognition Linked', icon: UserCheck, color: 'text-[#10B981]' },
-                    { title: 'Payroll Automation Engaged', icon: Zap, color: 'text-[#B5793A]' },
+                    { title: 'Payroll Automation Engaged', icon: Zap, color: 'text-[#1F2B4D]' },
                     { title: 'WAI-ARIA APG Enforced', icon: Layers, color: 'text-[#0B1121]' },
                   ].map((item, i) => (
                     <motion.div 
@@ -257,10 +280,7 @@ export default function Landing() {
       <footer className="bg-[#0B1121] pt-12 pb-8 px-6 md:px-12 text-white/60 text-sm border-t border-[#050811]">
         <div className="max-w-[1400px] mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white">
-              <Building2 size={16} />
-            </div>
-            <span className="font-serif font-bold text-white tracking-wide">Crew HRMS</span>
+            <img src="/crew-new.png" alt="Crew HRMS Logo" className="h-10 w-auto object-contain brightness-0 invert opacity-90" />
           </div>
           <p>© {new Date().getFullYear()} Crew Enterprise. All rights reserved.</p>
         </div>

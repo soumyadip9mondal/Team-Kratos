@@ -1,4 +1,5 @@
 const prisma = require('../config/db');
+const { countBusinessDays } = require('../config/scheduleConfig');
 const { dispatchWebhook } = require('../utils/webhookDispatcher');
 const { sendNotification } = require('../utils/notificationEngine');
 const { calculateAdvanceRiskScore } = require('../utils/riskScoringEngine');
@@ -336,14 +337,7 @@ const getAllAdvances = async (req, res) => {
                   } else if (leave.durationType === 'Hourly') {
                     leaveDuration = (leave.hoursRequested || 0) / 8;
                   } else {
-                    let count = 0;
-                    let current = new Date(start);
-                    while (current <= end) {
-                      const day = current.getDay();
-                      if (day !== 0 && day !== 6) count++;
-                      current.setDate(current.getDate() + 1);
-                    }
-                    leaveDuration = count;
+                    leaveDuration = countBusinessDays(start, end);
                   }
                   unpaidLeaveDays += leaveDuration;
                 }

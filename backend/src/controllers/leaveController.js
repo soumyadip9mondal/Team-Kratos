@@ -5,6 +5,7 @@ const { reserveLeave, reverseLeave, getAvailableBalance } = require('../utils/le
 const { isManagerOf, getSubordinateIds } = require('../utils/managerHierarchy');
 const { applyLeaveSchema, createPolicySchema } = require('../../../packages/shared/validations/leave');
 const { enrollAllUsersInPolicy } = require('../jobs/leaveEnrollmentJob');
+const { isDefaultOffDay, countBusinessDays } = require('../config/scheduleConfig');
 
 const imagekit = new ImageKit({
     publicKey : process.env.IMAGEKIT_PUBLIC_KEY,
@@ -17,23 +18,11 @@ const imagekit = new ImageKit({
 // ──────────────────────────────────────────────────────────────────
 
 /**
- * Count business days between two dates (Mon-Fri, 5-day week as tenant default).
+ * Count business days between two dates (Mon-Sat as tenant default working days, Sun as off day).
  * Per decision record: working-day patterns are org-level, not per-employee.
  */
-function countBusinessDays(startDate, endDate) {
-  let count = 0;
-  const current = new Date(startDate);
-  current.setHours(0, 0, 0, 0);
-  const end = new Date(endDate);
-  end.setHours(0, 0, 0, 0);
+// countBusinessDays imported from ../config/scheduleConfig
 
-  while (current <= end) {
-    const day = current.getDay();
-    if (day !== 0 && day !== 6) count++;
-    current.setDate(current.getDate() + 1);
-  }
-  return count;
-}
 
 /**
  * Calculate the number of leave days requested based on durationType.
@@ -210,8 +199,8 @@ const applyLeave = async (req, res) => {
     const start = new Date(validated.startDate);
     const end = new Date(validated.endDate);
 
-    if (start.getDay() === 0 || start.getDay() === 6 || end.getDay() === 0 || end.getDay() === 6) {
-      return res.status(400).json({ error: 'Leaves cannot start or end on a weekend (Saturday/Sunday)' });
+    if (isDefaultOffDay(start) || isDefaultOffDay(end)) {
+      return res.status(400).json({ error: 'Leaves cannot start or end on a weekly off day (Sunday)' });
     }
 
     // Calculate leave days

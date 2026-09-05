@@ -283,12 +283,12 @@ const Attendance = ({ user }) => {
         }. You are currently outside this window.`;
       }
     } else {
-      // Fallback to weekend check if API data not available
-      const isWeekend = currentTime.getDay() === 0 || currentTime.getDay() === 6;
-      if (isWeekend) {
+      // Fallback to weekly off check if API data not available
+      const isWeeklyOff = currentTime.getDay() === 0; // Sunday is Weekly Off Day; Saturday is Working Day
+      if (isWeeklyOff) {
         isOutsideShift = true;
-        shiftTitle = "Weekend / Off Day";
-        shiftMessage = "Today is a designated off day. Clock-in is disabled until your next working day.";
+        shiftTitle = "Weekly Off Day";
+        shiftMessage = "Today is a designated off day (Sunday). Clock-in is disabled until your next working day.";
       }
     }
   }

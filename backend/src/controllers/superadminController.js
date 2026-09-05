@@ -71,6 +71,9 @@ const createTenant = async (req, res) => {
       }
     });
 
+    const { seed: seedCommunicationReview } = require('../services/communicationPersonaSeeder');
+    await seedCommunicationReview(prisma.basePrisma, tenant.id);
+
     sendNotification({
       userId: adminUser.id,
       tenantId: tenant.id,

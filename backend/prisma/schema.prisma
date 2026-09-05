@@ -72,6 +72,7 @@ model Tenant {
   onboardingChecklistTemplates     OnboardingChecklistTemplate[]
   onboardingChecklistTemplateTasks OnboardingChecklistTemplateTask[]
   onboardingDocuments              OnboardingDocument[]
+  onboardingDocumentRequirements   OnboardingDocumentRequirement[]
   goals                            Goal[]
   reviews                          Review[]
 
@@ -112,6 +113,10 @@ model Tenant {
   irisTasks     IrisTask[]
   irisApprovals IrisApproval[]
   appNotifications AppNotification[]
+
+  communicationReviewConfig   CommunicationReviewConfig?
+  communicationPersonas       CommunicationPersona[]
+  communicationStressTests    CommunicationStressTest[]
 }
 
 model RoleDefinition {
@@ -346,7 +351,7 @@ model User {
   dateOfBirth   DateTime?
   dateOfJoining DateTime? @default(now())
 
-  workingDaysPerWeek Int   @default(5)
+  workingDaysPerWeek Int   @default(6)
   breakTimeHrs       Float @default(1)
   baseSalary         Float @default(0)
 
@@ -395,6 +400,8 @@ model User {
 
   intelligenceProfile IntelligenceProfile?
   intelligenceSignals IntelligenceSignal[]
+
+  createdPersonas     CommunicationPersona[] @relation("PersonaCreator")
 
   @@unique([tenantId, employeeId])
 }
@@ -647,6 +654,9 @@ model Announcement {
 
   wishes BirthdayWish[]
 
+  stressTestId      String?  @unique
+  stressTestVariant String?
+
   @@index([tenantId, createdAt])
 }
 
@@ -833,14 +843,41 @@ model OnboardingChecklistTemplateTask {
 }
 
 model OnboardingDocument {
-  id         String   @id @default(uuid())
-  tenantId   String
-  tenant     Tenant   @relation(fields: [tenantId], references: [id])
-  userId     String
-  user       User     @relation(fields: [userId], references: [id])
-  type       String
-  fileId     String
-  uploadedAt DateTime @default(now())
+  id                  String    @id @default(uuid())
+  tenantId            String
+  tenant              Tenant    @relation(fields: [tenantId], references: [id])
+  userId              String
+  user                User      @relation(fields: [userId], references: [id])
+  type                String    // e.g., 'IDENTITY_PROOF', 'ADDRESS_PROOF', 'EDUCATION_CERTIFICATE', 'EMPLOYMENT_PROOF', 'PAN', 'AADHAAR'
+  fileId              String
+  version             Int       @default(1)
+  status              String    @default("UPLOADED") // UPLOADED, PROCESSING, EXTRACTED, VERIFIED, REQUIRES_REVIEW, REJECTED, EXPIRED
+  extractedData       Json?     // PII-masked evidence (no raw full government IDs stored)
+  confidence          Float?
+  warnings            String[]
+  evidenceFingerprint String?   // SHA-256 fingerprint for version-aware explainability
+  timelineEvents      Json?     // Array of versioned timeline events [{ timestamp, actor, action, documentVersion, decision, reason, fingerprint }]
+  verifiedAt          DateTime?
+  verifiedBy          String?
+  uploadedAt          DateTime  @default(now())
+  updatedAt           DateTime  @default(now()) @updatedAt
+
+  @@index([tenantId, userId])
+  @@index([tenantId, status])
+}
+
+model OnboardingDocumentRequirement {
+  id           String   @id @default(uuid())
+  tenantId     String
+  tenant       Tenant   @relation(fields: [tenantId], references: [id])
+  documentType String
+  isRequired   Boolean  @default(true)
+  description  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([tenantId, documentType])
+  @@index([tenantId])
 }
 
 enum GoalCategory {
@@ -1792,3 +1829,126 @@ model IrisApproval {
   actionType          String
   proposalFingerprint String
 }
+
+// ── Communication Stress Testing ────────────────────────────
+
+enum SourceType {
+  ANNOUNCEMENT
+  TEAM_MESSAGE
+}
+
+enum TestStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  INCOMPLETE
+  EXPIRED
+  REDACTED
+}
+
+enum FrictionBand {
+  LOW
+  MODERATE
+  HIGH
+  CRITICAL
+}
+
+model CommunicationReviewConfig {
+  id                    String   @id @default(uuid())
+  tenantId              String   @unique
+  tenant                Tenant   @relation(fields: [tenantId], references: [id])
+  enabled               Boolean  @default(false)
+  policyContextEnabled  Boolean  @default(false)
+  personaBuilderEnabled Boolean  @default(false)
+  analyticsEnabled      Boolean  @default(false)
+  detailRetentionDays   Int      @default(90)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+}
+
+model CommunicationPersona {
+  id          String   @id @default(uuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  key         String
+  name        String
+  roleFamily  String
+  focusAreas  String[]
+  isSystem    Boolean  @default(false)
+  isActive    Boolean  @default(true)
+  createdById String?
+  createdBy   User?    @relation("PersonaCreator", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([tenantId, key])
+  @@index([tenantId, isActive])
+}
+
+model CommunicationStressTest {
+  id                   String       @id @default(uuid())
+  tenantId             String
+  tenant               Tenant       @relation(fields: [tenantId], references: [id])
+  createdById          String
+  idempotencyKey       String
+  parentTestId         String?
+  sourceType           SourceType
+  title                String       @db.VarChar(160)
+  message              String       @db.Text
+  category             String?
+  contentFingerprint   String
+  status               TestStatus   @default(PENDING)
+  overallFrictionScore Int?
+  frictionBand         FrictionBand?
+  dimensionScores      Json?
+  rewriteMessage       String?      @db.Text
+  rewriteMetadata      Json?
+  modelVersion         String?
+  promptVersion        String?
+  scoringVersion       String?
+  expiresAt            DateTime?
+  redactedAt           DateTime?
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
+
+  reactions CommunicationPersonaReaction[]
+  events    CommunicationStressTestEvent[]
+
+  @@unique([tenantId, createdById, idempotencyKey])
+  @@index([tenantId, createdById])
+  @@index([tenantId, createdAt])
+  @@index([tenantId, status])
+}
+
+model CommunicationPersonaReaction {
+  id           String                  @id @default(uuid())
+  tenantId     String
+  stressTestId String
+  stressTest   CommunicationStressTest @relation(fields: [stressTestId], references: [id], onDelete: Cascade)
+  personaKey   String
+  personaName  String
+  summary      String?                 @db.Text
+  concernTypes String[]
+  maxSeverity  String?
+  concerns     Json
+  mitigations  Json?
+  createdAt    DateTime                @default(now())
+
+  @@unique([stressTestId, personaKey])
+  @@index([tenantId, stressTestId])
+}
+
+model CommunicationStressTestEvent {
+  id           String                  @id @default(uuid())
+  tenantId     String
+  stressTestId String
+  stressTest   CommunicationStressTest @relation(fields: [stressTestId], references: [id], onDelete: Cascade)
+  actorId      String?
+  eventType    String
+  metadata     Json?
+  createdAt    DateTime                @default(now())
+
+  @@index([tenantId, stressTestId])
+}
+

@@ -145,7 +145,7 @@ const createEmployee = async (req, res) => {
         location: location || null,
         entityId: entityId || null,
         officeId: officeId || null,
-        workingDaysPerWeek: workingDaysPerWeek ? parseInt(workingDaysPerWeek) : 5,
+        workingDaysPerWeek: workingDaysPerWeek ? parseInt(workingDaysPerWeek) : 6,
         breakTimeHrs: breakTimeHrs ? parseFloat(breakTimeHrs) : 1.0,
         dateOfJoining: new Date()
       }
@@ -185,12 +185,21 @@ const getMyProfile = async (req, res) => {
   res.json(safeUser);
 };
 
-// ── Get all employees (Admin only) ───────────────────────
+const allEmployeesCache = new Map();
+const EMPLOYEES_CACHE_TTL = 15000;
 
 const getAllEmployees = async (req, res) => {
   try {
-    const targetDateStr = req.query.date;
-    const targetDate = targetDateStr ? new Date(targetDateStr) : new Date();
+    const targetDateStr = req.query.date || 'today';
+    const tenantId = req.user.tenantId || 'global';
+    const cacheKey = `${tenantId}_${targetDateStr}`;
+    const now = Date.now();
+    const cached = allEmployeesCache.get(cacheKey);
+    if (cached && (now - cached.timestamp < EMPLOYEES_CACHE_TTL)) {
+      return res.json(cached.data);
+    }
+
+    const targetDate = req.query.date ? new Date(req.query.date) : new Date();
     
     const targetStart = new Date(Date.UTC(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate(), 0, 0, 0, 0));
     const targetEnd = new Date(Date.UTC(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate(), 23, 59, 59, 999));
@@ -267,6 +276,7 @@ const getAllEmployees = async (req, res) => {
     const { attachAttendancePercentages } = require('../services/attendanceEngine');
     const usersWithAttendance = await attachAttendancePercentages(usersMapped, req.user.tenantId);
 
+    allEmployeesCache.set(cacheKey, { timestamp: Date.now(), data: usersWithAttendance });
     res.json(usersWithAttendance);
   } catch (error) {
     console.error('Get all employees error:', error);

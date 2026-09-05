@@ -19,7 +19,7 @@ function Footerdemo() {
       <div className="max-w-7xl mx-auto px-4 py-12 md:px-6 lg:px-8">
         <div className="grid gap-12 md:grid-cols-2 lg:grid-cols-4">
           <div className="relative">
-            <h2 className="mb-4 text-3xl font-black tracking-tight text-indigo-700">Crew</h2>
+            <img src="/crew-new.png" alt="Crew HRMS Logo" className="h-14 w-auto object-contain mb-4 drop-shadow-sm" />
             <p className="mb-6 text-slate-500 max-w-sm">
               The modern HRMS built for forward-thinking organizations. Automate payroll, manage leaves, and scale your workforce with zero friction.
             </p>
@@ -30,6 +30,9 @@ function Footerdemo() {
             <nav className="space-y-2 text-sm">
               <Link to="/" className="block transition-colors hover:text-indigo-600 text-slate-600">
                 Home
+              </Link>
+              <Link to="/jobs" className="block transition-colors hover:text-indigo-600 text-slate-600">
+                Jobs
               </Link>
               <Link to="/signup" className="block transition-colors hover:text-indigo-600 text-slate-600">
                 Sign Up

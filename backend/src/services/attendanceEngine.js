@@ -1,4 +1,5 @@
 const prisma = require('../config/db');
+const { isDefaultWorkingDay } = require('../config/scheduleConfig');
 
 /**
  * Validates a Date object.
@@ -107,8 +108,8 @@ async function calculateLifetimeAttendance(userId, tenantId) {
         // Day is explicitly scheduled in roster
         expectedWorkingDaysSet.add(dateString);
       } else {
-        // Fallback: assume Mon-Fri if no roster explicitly says otherwise (or based on their shift policy)
-        if (dayOfWeek !== 0 && dayOfWeek !== 6) { 
+        // Fallback: default schedule (Mon-Sat working, Sun off) if no explicit roster entry
+        if (isDefaultWorkingDay(current)) { 
            expectedWorkingDaysSet.add(dateString);
         }
       }
@@ -235,7 +236,7 @@ async function calculateLifetimeAttendance(userId, tenantId) {
 }
 
 const lifetimeCache = new Map();
-const CACHE_TTL = 300000; // 5 minutes in ms
+const CACHE_TTL = 120000; // 2 minutes TTL
 
 /**
  * Calculates lifetime attendance for an array of users efficiently.
@@ -243,19 +244,45 @@ const CACHE_TTL = 300000; // 5 minutes in ms
 async function attachAttendancePercentages(users, tenantId) {
   if (!users || users.length === 0) return users;
 
-  const userIds = users.map(u => u.id);
-  const now = new Date();
-  
-  // Bulk Fetch 1: All Users (Joining Dates)
+  const now = Date.now();
+  const NinetyDaysAgo = new Date();
+  NinetyDaysAgo.setDate(NinetyDaysAgo.getDate() - 90);
+  NinetyDaysAgo.setHours(0, 0, 0, 0);
+
+  // Check cache first
+  const uncachedUsers = [];
+  const cachedResults = new Map();
+
+  for (const u of users) {
+    const cached = lifetimeCache.get(u.id);
+    if (cached && (now - cached.timestamp < CACHE_TTL)) {
+      cachedResults.set(u.id, cached.data);
+    } else {
+      uncachedUsers.push(u);
+    }
+  }
+
+  // If all users are cached, return immediately
+  if (uncachedUsers.length === 0) {
+    return users.map(u => ({ ...u, ...cachedResults.get(u.id) }));
+  }
+
+  const userIds = uncachedUsers.map(u => u.id);
+
+  // Bulk Fetch 1: Uncached Users (Joining Dates)
   const usersData = await prisma.basePrisma.user.findMany({
     where: { id: { in: userIds }, tenantId },
     select: { id: true, createdAt: true, dateOfJoining: true, shiftPolicyId: true }
   });
   const userMap = new Map(usersData.map(u => [u.id, u]));
 
-  // Bulk Fetch 2: All Shift Assignments
+  // Bulk Fetch 2: Shift Assignments within 90-day window
   const allAssignments = await prisma.basePrisma.shiftAssignment.findMany({
-    where: { employeeId: { in: userIds }, tenantId },
+    where: { 
+      employeeId: { in: userIds }, 
+      tenantId,
+      slot: { date: { gte: NinetyDaysAgo } }
+    },
     include: { slot: true }
   });
   const assignmentsByUser = {};
@@ -264,9 +291,14 @@ async function attachAttendancePercentages(users, tenantId) {
     assignmentsByUser[a.employeeId].push(a);
   });
 
-  // Bulk Fetch 3: All Approved Leaves
+  // Bulk Fetch 3: Approved Leaves within 90-day window
   const allLeaves = await prisma.basePrisma.leave.findMany({
-    where: { userId: { in: userIds }, tenantId, status: 'Approved' },
+    where: { 
+      userId: { in: userIds }, 
+      tenantId, 
+      status: 'Approved',
+      endDate: { gte: NinetyDaysAgo }
+    },
     select: { userId: true, startDate: true, endDate: true }
   });
   const leavesByUser = {};
@@ -275,9 +307,13 @@ async function attachAttendancePercentages(users, tenantId) {
     leavesByUser[l.userId].push(l);
   });
 
-  // Bulk Fetch 4: All Attendances
+  // Bulk Fetch 4: Attendances within 90-day window
   const allAttendances = await prisma.basePrisma.attendance.findMany({
-    where: { userId: { in: userIds }, tenantId },
+    where: { 
+      userId: { in: userIds }, 
+      tenantId,
+      date: { gte: NinetyDaysAgo }
+    },
     select: { userId: true, date: true, status: true },
     orderBy: { createdAt: 'desc' }
   });
@@ -293,7 +329,7 @@ async function attachAttendancePercentages(users, tenantId) {
   globalEndDate.setDate(globalEndDate.getDate() - 1);
   globalEndDate.setHours(23, 59, 59, 999);
 
-  return users.map(user => {
+  const newlyComputed = uncachedUsers.map(user => {
     try {
       const uData = userMap.get(user.id);
       if (!uData || (!uData.createdAt && !uData.dateOfJoining)) {
@@ -332,7 +368,7 @@ async function attachAttendancePercentages(users, tenantId) {
         if (scheduledDatesMap.has(dateString)) {
           expectedWorkingDaysSet.add(dateString);
         } else {
-          if (dayOfWeek !== 0 && dayOfWeek !== 6) { 
+          if (isDefaultWorkingDay(current)) { 
              expectedWorkingDaysSet.add(dateString);
           }
         }
@@ -403,8 +439,7 @@ async function attachAttendancePercentages(users, tenantId) {
       const percentage = expectedWorkingDaysCount === 0 ? 100 : (earnedCredits / expectedWorkingDaysCount) * 100;
       const finalPercentage = Math.min(Math.max(Math.round(percentage * 10) / 10, 0), 100);
 
-      return { 
-        ...user, 
+      const resultStats = { 
         attendancePercentage: finalPercentage, 
         rawEarnedDays,
         expectedWorkingDays: expectedWorkingDaysCount,
@@ -412,6 +447,8 @@ async function attachAttendancePercentages(users, tenantId) {
         inconsistencyType,
         inconsistencyDetails
       };
+      lifetimeCache.set(user.id, { timestamp: Date.now(), data: resultStats });
+      return { ...user, ...resultStats };
     } catch (err) {
       console.error(err);
       return { 
@@ -421,6 +458,13 @@ async function attachAttendancePercentages(users, tenantId) {
         inconsistencyType: "SYSTEM_FAILURE"
       }; 
     }
+  });
+
+  return users.map(u => {
+    const cached = cachedResults.get(u.id);
+    if (cached) return { ...u, ...cached };
+    const freshlyComputed = newlyComputed.find(nc => nc.id === u.id);
+    return freshlyComputed || u;
   });
 }
 

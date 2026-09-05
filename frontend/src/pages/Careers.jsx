@@ -10,8 +10,9 @@ const Careers = () => {
   const location = useLocation();
   const navigate = useNavigate();
   
-  // Parse path: /careers, /careers/job/:id, /careers/:tenant, /careers/:tenant/job/:id
+  // Parse path: /jobs, /jobs/job/:id, /jobs/:tenant, /jobs/:tenant/job/:id (or /careers equivalent)
   const pathParts = location.pathname.split('/').filter(Boolean);
+  const basePrefix = pathParts[0] === 'jobs' ? '/jobs' : '/careers';
   let tenantId = null;
   let jobId = null;
   
@@ -54,11 +55,11 @@ const Careers = () => {
   const handleSelectJob = (job) => {
     setSelectedJob(job);
     if (job) {
-      if (tenantId) navigate(`/careers/${tenantId}/job/${job.id}`, { replace: true });
-      else navigate(`/careers/job/${job.id}`, { replace: true });
+      if (tenantId) navigate(`${basePrefix}/${tenantId}/job/${job.id}`, { replace: true });
+      else navigate(`${basePrefix}/job/${job.id}`, { replace: true });
     } else {
-      if (tenantId) navigate(`/careers/${tenantId}`, { replace: true });
-      else navigate(`/careers`, { replace: true });
+      if (tenantId) navigate(`${basePrefix}/${tenantId}`, { replace: true });
+      else navigate(`${basePrefix}`, { replace: true });
     }
   };
 
@@ -97,11 +98,10 @@ const Careers = () => {
       {/* Header */}
       <header className="bg-white/80 backdrop-blur-md border-b border-[#EAE7E0] py-5 sticky top-0 z-50 shadow-sm">
         <div className="max-w-[1400px] mx-auto px-6 lg:px-12 flex justify-between items-center">
-          <div className="flex items-center gap-3">
-            <div className="bg-[#1F2B4D] p-2 rounded-xl text-white shadow-sm">
-              <Briefcase size={22} />
-            </div>
-            <h1 className="text-2xl font-serif font-bold text-[#1D1B16] italic tracking-tight">Careers</h1>
+          <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/')}>
+            <img src="/crew-new.png" alt="Crew HRMS Logo" className="h-10 sm:h-12 w-auto object-contain drop-shadow-xs" />
+            <div className="h-6 w-[1px] bg-[#EAE7E0] mx-1" />
+            <h1 className="text-xl font-serif font-bold text-[#1D1B16] italic tracking-tight">Careers</h1>
           </div>
           <button 
             onClick={() => navigate('/')}

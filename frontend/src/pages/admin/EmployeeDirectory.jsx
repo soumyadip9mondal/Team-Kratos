@@ -112,7 +112,7 @@ const DailyAttendanceSpectrumWidget = ({ stats, targetDate, setTargetDate }) => 
           const isPast = idx < todayIdx;
           const isToday = idx === todayIdx;
           const isFuture = idx > todayIdx;
-          const isWeekend = idx === 0 || idx === 6;
+          const isWeekend = idx === 0; // Sunday is Weekly Off Day; Saturday is Working Day
 
           let presentCount = isToday && !isWeekend ? currPresent : 0;
           let halfDayCount = isToday && !isWeekend ? currHalfDay : 0;
@@ -277,7 +277,7 @@ const DailyAttendanceSpectrumWidget = ({ stats, targetDate, setTargetDate }) => 
                     <span>{d.dayName} {d.isToday && !d.isWeekend ? '(Today in Swing)' : d.isPast ? '(Recorded)' : '(Upcoming)'}</span>
                   </div>
                   {d.isWeekend ? (
-                    <span className="text-slate-300 italic">Weekend (Off Day)</span>
+                    <span className="text-slate-300 italic">Weekly Off</span>
                   ) : d.isFuture ? (
                     <span className="text-slate-300 italic">Not recorded yet</span>
                   ) : (
@@ -435,63 +435,34 @@ const StatCard = ({ icon: Icon, label, value, subtext, color, iconBg, isActive, 
 
 // ── Filter Dropdown ────────────────────────────────────────────────────────
 const FilterDropdown = ({ label, options, value, onChange }) => {
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
-
-  useEffect(() => {
-    const handleClick = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, []);
-
   return (
-    <div ref={ref} className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        className={`flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl text-[10px] sm:text-xs font-display font-bold tracking-wide transition-all duration-200 border ${
+    <div className="relative flex items-center shrink-0">
+      <div className={`pointer-events-none absolute left-3 z-10 flex items-center gap-1 text-[11px] font-bold ${value ? 'text-[#1F2B4D]' : 'text-[#6B655C]'}`}>
+        <Filter size={12} className={value ? 'text-[#1F2B4D]' : 'opacity-60'} />
+      </div>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={`appearance-none cursor-pointer pl-8 pr-7 py-1.5 sm:py-2 rounded-xl text-[10px] sm:text-xs font-display font-bold tracking-wide transition-all duration-200 border outline-none shadow-xs ${
           value
-            ? 'bg-[#F0F3F9] text-[#1F2B4D] border-[#CBD5E1] shadow-xs'
+            ? 'bg-[#F0F3F9] text-[#1F2B4D] border-[#CBD5E1] font-extrabold'
             : 'bg-white text-[#6B655C] border-[#EAE7E0] hover:border-[#CBD5E1]'
         }`}
-        aria-haspopup="listbox"
-        aria-expanded={open}
       >
-        <Filter size={12} className={value ? 'text-[#1F2B4D]' : 'opacity-60'} />
-        {value || label}
-        {value ? (
-          <X size={13} className="opacity-70 hover:opacity-100 transition-opacity ml-1" onClick={(e) => { e.stopPropagation(); onChange(''); }} />
-        ) : (
-          <ChevronDown size={13} className={`transition-transform duration-200 opacity-60 ml-1 ${open ? 'rotate-180' : ''}`} />
-        )}
-      </button>
-      {open && (
-        <div className="absolute right-0 mt-1.5 w-52 rounded-[16px] bg-white border border-[#EAE7E0] shadow-xl backdrop-blur-md z-50 py-1.5 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-          <div className="px-3 py-1.5 border-b border-[#F4F1EA] text-[10px] font-display font-bold text-[#9A948A] uppercase tracking-wider">
-            {label} Selection
-          </div>
-          <div className="max-h-56 overflow-y-auto py-1">
-            {options.map((opt) => {
-              const optVal = typeof opt === 'string' ? opt : opt.label || opt.name;
-              const optId = typeof opt === 'string' ? opt : opt.id || opt.name;
-              const isSelected = value === optVal;
-              return (
-                <button
-                  key={optId}
-                  type="button"
-                  onClick={() => { onChange(optVal); setOpen(false); }}
-                  className={`w-full text-left px-3 py-2 text-xs flex items-center justify-between transition-colors ${
-                    isSelected ? 'bg-[#F0F3F9] text-[#1F2B4D] font-bold' : 'text-[#1F2B4D] hover:bg-[#FAF8F5] font-medium'
-                  }`}
-                >
-                  <span>{optVal}</span>
-                  {isSelected && <Check className="w-3.5 h-3.5 text-[#1F2B4D]" />}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
+        <option value="">{label}</option>
+        {options.map((opt) => {
+          const optVal = typeof opt === 'string' ? opt : opt.label || opt.name;
+          const optId = typeof opt === 'string' ? opt : opt.id || opt.name;
+          return (
+            <option key={optId} value={optVal} className="text-[#1F2B4D] font-medium bg-white py-1">
+              {optVal}
+            </option>
+          );
+        })}
+      </select>
+      <div className="pointer-events-none absolute right-2 z-10 text-[#6B655C]">
+        <ChevronDown size={13} className="opacity-60" />
+      </div>
     </div>
   );
 };
@@ -1127,7 +1098,7 @@ const EmployeeDirectory = ({ user }) => {
   );
 
   const departments = useMemo(() =>
-    [...new Set(employees.map(e => e.department || 'General'))].sort(),
+    [...new Set(employees.map(e => (e.department || 'General').trim()))].filter(Boolean).sort(),
     [employees]
   );
 
@@ -1137,27 +1108,39 @@ const EmployeeDirectory = ({ user }) => {
     let list = employeesWithStatus;
 
     if (searchTerm) {
-      const q = searchTerm.toLowerCase();
+      const q = searchTerm.trim().toLowerCase();
       list = list.filter(emp =>
         (emp.displayName || '').toLowerCase().includes(q) ||
         (emp.employeeId || '').toLowerCase().includes(q) ||
         (emp.department || '').toLowerCase().includes(q) ||
-        (emp.email || '').toLowerCase().includes(q)
+        (emp.email || '').toLowerCase().includes(q) ||
+        (emp.jobPosition || '').toLowerCase().includes(q)
       );
     }
 
     if (deptFilter) {
-      list = list.filter(emp => (emp.department || 'General') === deptFilter);
+      const targetDept = deptFilter.trim().toLowerCase();
+      list = list.filter(emp => (emp.department || 'General').trim().toLowerCase() === targetDept);
     }
 
-    if (statusFilter === 'Present') {
-      list = list.filter(emp => emp._status.text === 'Present' || emp._status.text === 'Incomplete');
-    } else if (statusFilter === 'Half Day') {
-      list = list.filter(emp => emp._status.text.includes('Half Day'));
-    } else if (statusFilter === 'Absent') {
-      list = list.filter(emp => emp._status.text === 'Absent' || emp._status.text === 'Late / Pending');
-    } else if (statusFilter) {
-      list = list.filter(emp => emp._status.text === statusFilter);
+    if (statusFilter) {
+      const targetStatus = statusFilter.trim().toLowerCase();
+      if (targetStatus === 'present') {
+        list = list.filter(emp => emp._status.text === 'Present' || emp._status.text === 'Incomplete');
+      } else if (targetStatus === 'half day') {
+        list = list.filter(emp => emp._status.text.toLowerCase().includes('half day'));
+      } else if (targetStatus === 'absent') {
+        list = list.filter(emp => emp._status.text === 'Absent' || emp._status.text === 'Late / Pending');
+      } else if (targetStatus === 'on leave') {
+        list = list.filter(emp => emp._status.text === 'On Leave' || emp._status.text.toLowerCase().includes('leave'));
+      } else if (targetStatus === 'offboarded') {
+        list = list.filter(emp => emp.status === 'Inactive' || emp.status === 'Offboarded' || emp._status.text === 'Offboarded');
+      } else {
+        list = list.filter(emp => 
+          emp._status.text.toLowerCase().includes(targetStatus) || 
+          (emp.status || '').toLowerCase() === targetStatus
+        );
+      }
     }
 
     list = [...list].sort((a, b) => {

@@ -107,12 +107,12 @@ export const generateHeatmapData = (attendanceData, leaves) => {
       label = `${leaveRecord.type} Leave`;
     } else if (isBefore(date, today) || isSameDay(date, today)) {
       const dayOfWeek = date.getDay();
-      if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+      if (dayOfWeek !== 0) {
         status = 'absent';
         label = 'Absent';
       } else {
         status = 'weekend';
-        label = 'Weekend';
+        label = 'Off Day';
       }
     }
 

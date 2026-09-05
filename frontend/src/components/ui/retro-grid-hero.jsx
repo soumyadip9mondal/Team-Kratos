@@ -61,6 +61,7 @@ const HeroSection = forwardRef(
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
               
               <div className="space-y-8 max-w-xl text-center lg:text-left mx-auto lg:mx-0">
+
                 {/* Eyebrow Tag */}
                 <div className="w-fit mx-auto lg:mx-0">
                   <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/80 backdrop-blur shadow-xs text-[11px] font-display font-bold uppercase tracking-[0.15em] text-[#1F2B4D] border border-[#EAE7E0] cursor-default">

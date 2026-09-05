@@ -6,7 +6,7 @@ const VALID_CATEGORIES = ['General', 'Policy', 'Event', 'Birthday', 'Urgent'];
 
 const createAnnouncement = async (req, res) => {
   try {
-    const { title, message, category } = req.body;
+    const { title, message, category, stressTestId, stressTestVariant } = req.body;
     if (!title || !message) {
       return res.status(400).json({ error: 'Title and message are required' });
     }
@@ -14,13 +14,69 @@ const createAnnouncement = async (req, res) => {
     const selectedCategory = category && VALID_CATEGORIES.includes(category) ? category : 'General';
     const tenantId = req.user.tenantId;
 
+    // Validate stress-test linkage if provided
+    let verifiedStressTestId = null;
+    let verifiedStressTestVariant = null;
+
+    if (stressTestId) {
+      const stressTest = await prisma.basePrisma.communicationStressTest.findFirst({
+        where: {
+          id: stressTestId,
+          tenantId,
+          createdById: req.user.id,
+        },
+      });
+
+      if (!stressTest) {
+        return res.status(400).json({ error: 'Invalid stress test reference.' });
+      }
+
+      if (stressTest.sourceType !== 'ANNOUNCEMENT' || stressTest.status !== 'COMPLETED') {
+        return res.status(400).json({ error: 'Stress test is not completed for announcements.' });
+      }
+
+      if (stressTest.expiresAt && new Date(stressTest.expiresAt) < new Date()) {
+        return res.status(400).json({ error: 'Stress test reference has expired.' });
+      }
+
+      // Check if already linked to another announcement
+      const existingLink = await prisma.basePrisma.announcement.findFirst({
+        where: { stressTestId },
+      });
+      if (existingLink) {
+        return res.status(400).json({ error: 'Stress test has already been linked to an announcement.' });
+      }
+
+      verifiedStressTestId = stressTest.id;
+      verifiedStressTestVariant = stressTestVariant || 'ORIGINAL';
+
+      // Record publication event
+      const eventType =
+        verifiedStressTestVariant === 'REWRITE'
+          ? 'PUBLISHED_REWRITE'
+          : verifiedStressTestVariant === 'EDITED_REWRITE'
+          ? 'PUBLISHED_EDITED_REWRITE'
+          : 'PUBLISHED_ORIGINAL';
+
+      await prisma.basePrisma.communicationStressTestEvent.create({
+        data: {
+          tenantId,
+          stressTestId: stressTest.id,
+          actorId: req.user.id,
+          eventType,
+        },
+      }).catch((e) => console.error('[Announcement] Event log error:', e.message));
+    }
+
     const announcement = await prisma.announcement.create({
       data: {
         tenantId,
         adminId: req.user.id,
         title,
         category: selectedCategory,
-        message
+        message,
+        stressTestId: verifiedStressTestId,
+        stressTestVariant: verifiedStressTestVariant,
       },
       include: {
         admin: { select: { displayName: true, avatar: true } },

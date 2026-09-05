@@ -1,6 +1,9 @@
 const jwt = require('jsonwebtoken');
 const prisma = require('../config/db');
+const { withRetry } = prisma;
 const tenantStorage = require('./tenantContext');
+
+const authUserCache = new Map();
 
 const auth = async (req, res, next) => {
   try {
@@ -19,13 +22,23 @@ const auth = async (req, res, next) => {
     const userId = decoded._id || decoded.id;
     if (!userId) throw new Error('Invalid token payload');
 
-    const user = await prisma.basePrisma.user.findUnique({ 
-      where: { id: userId },
-      include: { roleDefinition: true, shiftPolicy: true }
-    });
+    const now = Date.now();
+    const cachedAuth = authUserCache.get(userId);
+    let user;
 
-    if (!user) {
-      throw new Error();
+    if (cachedAuth && (now - cachedAuth.timestamp < 30000) && cachedAuth.user.otpCode === null) {
+      user = cachedAuth.user;
+    } else {
+      user = await withRetry(() => prisma.basePrisma.user.findUnique({ 
+        where: { id: userId },
+        include: { roleDefinition: true, shiftPolicy: true }
+      }));
+      if (!user) throw new Error();
+      if (user.otpCode === null) {
+        authUserCache.set(userId, { timestamp: now, user });
+      } else {
+        authUserCache.delete(userId);
+      }
     }
 
     // CRITICAL SECURITY FIX: Prevent OTP bypass
@@ -57,6 +70,10 @@ const auth = async (req, res, next) => {
   } catch (error) {
     res.status(401).send({ error: 'Please authenticate.' });
   }
+};
+
+auth.clearAuthUserCache = (userId) => {
+  if (userId) authUserCache.delete(userId);
 };
 
 module.exports = auth;

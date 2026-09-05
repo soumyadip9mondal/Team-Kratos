@@ -57,18 +57,9 @@ export default function Dashboard() {
         <div>
           {/* Brand Header & Toggle Control */}
           {isSidebarOpen ? (
-            <div className="flex items-center justify-between gap-3.5 mb-8 pb-6 border-b border-[#1E2333]">
-              <div className="flex items-center gap-3.5 min-w-0">
-                <div className="w-10 h-10 rounded-xl bg-[#1F2B4D] border border-white/10 flex items-center justify-center text-white font-extrabold text-xl shadow-md shrink-0">
-                  C
-                </div>
-                <div className="truncate">
-                  <div className="text-base font-extrabold tracking-tight text-white flex items-center gap-2 truncate">
-                    Crew HRMS
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
-                  </div>
-                  <div className="text-[10px] font-bold tracking-widest text-[#94A3B8] uppercase truncate">EXECUTIVE CONSOLE</div>
-                </div>
+            <div className="flex items-center justify-between gap-3 mb-8 pb-6 border-b border-[#1E2333]">
+              <div className="flex items-center gap-3 min-w-0">
+                <img src="/crew-new.png" alt="Crew HR Logo" className="h-12 sm:h-14 w-auto max-w-[170px] object-contain mix-blend-screen opacity-95" />
               </div>
 
               <button 
@@ -81,9 +72,7 @@ export default function Dashboard() {
             </div>
           ) : (
             <div className="hidden md:flex flex-col items-center gap-3 mb-8 pb-6 border-b border-[#1E2333]">
-              <div className="w-10 h-10 rounded-xl bg-[#1F2B4D] border border-white/10 flex items-center justify-center text-white font-extrabold text-xl shadow-md shrink-0">
-                C
-              </div>
+              <img src="/crew-new.png" alt="Crew HR Logo" className="h-8 w-auto max-w-[44px] object-contain mix-blend-screen opacity-95" />
               <button 
                 onClick={() => setIsSidebarOpen(true)}
                 title="Expand Sidebar"

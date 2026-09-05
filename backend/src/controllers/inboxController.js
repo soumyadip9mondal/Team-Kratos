@@ -6,6 +6,9 @@ const generateHash = (userId, surveyId) => {
   return crypto.createHash('sha256').update(`${userId}:${surveyId}:${salt}`).digest('hex');
 };
 
+const inboxCache = new Map();
+const INBOX_CACHE_TTL = 15000; // 15s TTL
+
 const getInbox = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -13,6 +16,13 @@ const getInbox = async (req, res) => {
     if (!tenantId) {
       return res.json([]);
     }
+
+    const now = Date.now();
+    const cached = inboxCache.get(userId);
+    if (cached && (now - cached.timestamp < INBOX_CACHE_TTL)) {
+      return res.json(cached.data);
+    }
+
     const isFounder = req.user.roleDefinition?.level === 0;
     const isAdmin = req.user.roleDefinition?.level <= 1 || req.user.customRole === 'SuperAdmin' || req.user.role === 'SuperAdmin';
 
@@ -37,25 +47,25 @@ const getInbox = async (req, res) => {
         include: { user: { select: { displayName: true, email: true } }, tenant: { select: { name: true } } },
         orderBy: { updatedAt: 'desc' },
         take: 50
-      }),
+      }).catch(() => []),
       isAdmin ? prisma.salaryAdvance.findMany({
         where: { ...baseWhere, OR: [{ status: 'Pending' }, { updatedAt: { gte: fortyEightHoursAgo } }] },
         include: { user: { select: { displayName: true } }, tenant: { select: { name: true } } },
         orderBy: { updatedAt: 'desc' },
         take: 50
-      }) : Promise.resolve([]),
+      }).catch(() => []) : Promise.resolve([]),
       prisma.expenseClaim.findMany({
         where: expensesWhere,
         include: { user: { select: { displayName: true } }, tenant: { select: { name: true } } },
         orderBy: { updatedAt: 'desc' },
         take: 50
-      }),
+      }).catch(() => []),
       prisma.onboardingTask.findMany({
         where: { ...baseWhere, userId: userId, OR: [{ isCompleted: false }, { completedAt: { gte: fortyEightHoursAgo } }] },
         include: { tenant: { select: { name: true } } },
         orderBy: { createdAt: 'desc' },
         take: 50
-      }),
+      }).catch(() => []),
       isAdmin ? prisma.application.findMany({
         where: { ...baseWhere, OR: [{ stage: { notIn: ['Hired', 'Rejected'] } }, { updatedAt: { gte: fortyEightHoursAgo } }] },
         include: {
@@ -65,25 +75,25 @@ const getInbox = async (req, res) => {
         },
         orderBy: { updatedAt: 'desc' },
         take: 50
-      }) : Promise.resolve([]),
+      }).catch(() => []) : Promise.resolve([]),
       prisma.pulseSurvey.findMany({
         where: { ...baseWhere, isActive: true },
         include: { tenant: { select: { name: true } } },
         orderBy: { createdAt: 'desc' },
         take: 50
-      }),
+      }).catch(() => []),
       isAdmin ? prisma.intelligenceSignal.findMany({
         where: { ...baseWhere, severity: { in: ['HIGH', 'CRITICAL'] }, lifecycleState: 'NEW' },
         include: { user: { select: { displayName: true } }, tenant: { select: { name: true } } },
         orderBy: { createdAt: 'desc' },
         take: 50
-      }) : Promise.resolve([]),
+      }).catch(() => []) : Promise.resolve([]),
       isAdmin ? prisma.irisTask.findMany({
         where: { ...baseWhere, status: 'AWAITING_APPROVAL' },
         include: { recommendation: true, tenant: { select: { name: true } } },
         orderBy: { createdAt: 'desc' },
         take: 50
-      }) : Promise.resolve([]),
+      }).catch(() => []) : Promise.resolve([]),
       prisma.appNotification.findMany({
         where: {
           ...baseWhere,
@@ -98,7 +108,7 @@ const getInbox = async (req, res) => {
         include: { tenant: { select: { name: true } } },
         orderBy: { createdAt: 'desc' },
         take: 50
-      })
+      }).catch(() => [])
     ]);
 
     // 2. Process Results
@@ -197,29 +207,40 @@ const getInbox = async (req, res) => {
       });
     });
 
-    for (const s of pulseSurveys) {
-      const hash = generateHash(userId, s.id);
-      const hasResponded = await prisma.pulseResponse.findUnique({
-        where: { surveyId_respondentHash: { surveyId: s.id, respondentHash: hash } }
-      });
-      if (!hasResponded) {
-        inboxItems.push({
-          id: `pulse_${s.id}`,
-          type: 'PulseSurvey',
-          title: `Pulse Check: ${s.title}`,
-          description: `A new anonymous pulse survey requires your feedback.${appendTenant(s)}`,
-          createdAt: s.createdAt,
-          status: 'Pending',
-          actionUrl: '/dashboard/pulse',
-          originalId: s.id
+    if (pulseSurveys.length > 0) {
+      const pulseItems = await Promise.all(pulseSurveys.map(async (s) => {
+        const hash = generateHash(userId, s.id);
+        const hasResponded = await prisma.pulseResponse.findUnique({
+          where: { surveyId_respondentHash: { surveyId: s.id, respondentHash: hash } }
         });
-      }
+        if (!hasResponded) {
+          return {
+            id: `pulse_${s.id}`,
+            type: 'PulseSurvey',
+            title: `Pulse Check: ${s.title}`,
+            description: `A new anonymous pulse survey requires your feedback.${appendTenant(s)}`,
+            createdAt: s.createdAt,
+            status: 'Pending',
+            actionUrl: '/dashboard/pulse',
+            originalId: s.id
+          };
+        }
+        return null;
+      }));
+      pulseItems.filter(Boolean).forEach(item => inboxItems.push(item));
     }
 
     appNotifications.forEach(n => {
       // Security Failsafe Guard: Never render OTP or verification code items in dashboard inbox
       const text = `${n.title || ''} ${n.message || ''}`.toLowerCase();
       if (text.includes('otp') || text.includes('verification code') || text.includes('password reset')) return;
+
+      let actionUrl = '#';
+      if (n.data && n.data.link && n.data.link !== '#') {
+        actionUrl = n.data.link;
+      } else if (text.includes('announcement') || (n.type && n.type.toLowerCase().includes('announcement'))) {
+        actionUrl = '/dashboard/engagement';
+      }
 
       inboxItems.push({
         id: `notification_${n.id}`,
@@ -228,7 +249,7 @@ const getInbox = async (req, res) => {
         description: `${n.message || 'You have a new notification.'}${appendTenant(n)}`,
         createdAt: n.createdAt,
         status: n.isRead ? 'Read' : 'Unread',
-        actionUrl: (n.data && n.data.link) ? n.data.link : '#',
+        actionUrl,
         originalId: n.id
       });
     });
@@ -236,6 +257,7 @@ const getInbox = async (req, res) => {
     // Sort descending by created date
     inboxItems.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
+    inboxCache.set(userId, { timestamp: Date.now(), data: inboxItems });
     res.json(inboxItems);
   } catch (error) {
     console.error('getInbox error:', error);

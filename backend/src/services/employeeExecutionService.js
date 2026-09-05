@@ -100,6 +100,23 @@ async function executeAddEmployee(tenantId, adminRoleLevel, adminRoleName, admin
 
   const existing = await prisma.basePrisma.user.findUnique({ where: { email } });
   if (existing) {
+    // If user exists and is pending onboarding completion, enforce document requirements
+    const { getEmployeeDocumentStatus } = require('./irisDocumentAdapter');
+    const docStatus = await getEmployeeDocumentStatus(tenantId, existing.id);
+    if (!docStatus.isFullySatisfied) {
+      if (docStatus.missingCount > 0) {
+        throw new ExecutionError(
+          `DOCUMENTATION_INCOMPLETE: Cannot finalize onboarding for ${existing.displayName}. ${docStatus.missingCount} required onboarding document(s) missing.`,
+          400
+        );
+      }
+      if (docStatus.reviewRequiredCount > 0) {
+        throw new ExecutionError(
+          `DOCUMENT_REVIEW_REQUIRED: Cannot finalize onboarding for ${existing.displayName}. ${docStatus.reviewRequiredCount} onboarding document(s) require HR verification.`,
+          400
+        );
+      }
+    }
     throw new ExecutionError('An account with this email already exists', 400);
   }
 
@@ -136,7 +153,7 @@ async function executeAddEmployee(tenantId, adminRoleLevel, adminRoleName, admin
         location: location || null,
         entityId: entityId || null,
         officeId: resolvedOfficeId || null,
-        workingDaysPerWeek: workingDaysPerWeek ? parseInt(workingDaysPerWeek) : 5,
+        workingDaysPerWeek: workingDaysPerWeek ? parseInt(workingDaysPerWeek) : 6,
         breakTimeHrs: breakTimeHrs ? parseFloat(breakTimeHrs) : 1.0,
         dateOfJoining: new Date()
       }

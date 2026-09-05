@@ -25,7 +25,7 @@ const ShellLayout = ({ user, children }) => {
           <Menu size={24} />
         </button>
         <div className="flex flex-1 justify-start ml-2">
-          <img src="/Crew.png" alt="Crew HR" className="h-8 sm:h-10 object-contain" />
+          <img src="/crew-new.png" alt="Crew HR" className="h-8 sm:h-10 object-contain" />
         </div>
       </div>
 

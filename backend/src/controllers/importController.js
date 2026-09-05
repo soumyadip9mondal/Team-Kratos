@@ -177,7 +177,7 @@ const processCsvImport = async (jobId, tenantId, fileUrl, io) => {
             officeId: (row.office?.trim() && tenantOffices.find(o => o.name.toLowerCase() === row.office.trim().toLowerCase())?.id) || null,
             entityId: (row.entity?.trim() && tenantEntities.find(e => e.name.toLowerCase() === row.entity.trim().toLowerCase())?.id) || null,
             dateOfJoining: doj,
-            workingDaysPerWeek: 5,
+            workingDaysPerWeek: 6,
             breakTimeHrs: 1.0
           }
         });

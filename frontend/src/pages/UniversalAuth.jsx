@@ -214,7 +214,7 @@ export default function UniversalAuth({ defaultIsSignUp = false }) {
               <div className="absolute inset-4 rounded-full border-[3px] border-[#EAE7E0] border-b-emerald-500 animate-[spin_1.5s_linear_reverse_infinite]"></div>
               {/* Center Logo */}
               <div className="absolute inset-0 flex items-center justify-center">
-                <img src="/Crew.png" alt="Crew HR Logo" className="h-12 w-auto object-contain animate-pulse drop-shadow-sm" />
+                <img src="/crew-new.png" alt="Crew HR Logo" className="h-12 w-auto object-contain animate-pulse drop-shadow-sm" />
               </div>
             </div>
             <div className="flex flex-col items-center">

@@ -1,5 +1,38 @@
 const ALL_TOOLS = [
   {
+    name: 'getEmployeeDocumentStatus',
+    description: 'Check the onboarding document verification status and missing document requirements for an employee.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        employeeNameOrId: { type: 'STRING', description: 'Name or ID of the employee' }
+      },
+      required: ['employeeNameOrId']
+    }
+  },
+  {
+    name: 'checkOnboardingRequirements',
+    description: 'Check tenant-configured required onboarding document policy and missing items for an onboarding employee.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        employeeNameOrId: { type: 'STRING', description: 'Name or ID of the employee' }
+      },
+      required: ['employeeNameOrId']
+    }
+  },
+  {
+    name: 'analyzeEmployeeDocument',
+    description: 'Analyze an uploaded employee onboarding document to extract structured evidence, PII-masked numbers, confidence score, and consistency warnings.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        documentId: { type: 'STRING', description: 'The unique UUID of the OnboardingDocument' }
+      },
+      required: ['documentId']
+    }
+  },
+  {
     name: 'draftActionForApproval',
     description: 'Use this tool WHENEVER the user asks you to perform a state-changing action (e.g. "add a new employee", "schedule a shift", "post an announcement", "approve leave", "reject leave"). You cannot execute these directly. Instead, draft the exact action parameters for the HR Manager to approve safely. ALLOWED_ACTIONS: [ROSTER_ADJUSTMENT, ADD_EMPLOYEE, CREATE_ANNOUNCEMENT, APPROVE_LEAVE, REJECT_LEAVE]. For ADD_EMPLOYEE, you MUST provide email, displayName, customRole, and officeName. For CREATE_ANNOUNCEMENT, you MUST provide title, category, and message. For APPROVE_LEAVE or REJECT_LEAVE, you MUST provide leaveId (uuid) and optionally adminRemarks. For ROSTER_ADJUSTMENT, you MUST provide planId (string). IMPORTANT: If you need a leaveId or planId, you should search/generate it first. DO NOT hallucinate fake data.',
     parameters: {

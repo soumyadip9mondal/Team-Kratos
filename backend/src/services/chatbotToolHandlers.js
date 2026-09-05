@@ -26,6 +26,44 @@ async function resolveEmployee(identifier, tenantId) {
 }
 
 const TOOL_HANDLERS = {
+  async getEmployeeDocumentStatus({ employeeNameOrId }, ctx) {
+    const user = await resolveEmployee(employeeNameOrId, ctx.tenantId);
+    const { getEmployeeDocumentStatus } = require('./irisDocumentAdapter');
+    const statusInfo = await getEmployeeDocumentStatus(ctx.tenantId, user.id);
+    const resultObj = {
+      employeeName: user.displayName,
+      employeeId: user.employeeId,
+      ...statusInfo
+    };
+    const cardTag = statusInfo.documents && statusInfo.documents[0]
+      ? `\n\n[IRIS_DOCUMENT_CARD:${JSON.stringify(statusInfo.documents[0])}]`
+      : '';
+    return JSON.stringify(resultObj, null, 2) + cardTag;
+  },
+
+  async checkOnboardingRequirements({ employeeNameOrId }, ctx) {
+    const user = await resolveEmployee(employeeNameOrId, ctx.tenantId);
+    const { getEmployeeDocumentStatus } = require('./irisDocumentAdapter');
+    const statusInfo = await getEmployeeDocumentStatus(ctx.tenantId, user.id);
+    const firstDoc = statusInfo.documents && statusInfo.documents[0] ? statusInfo.documents[0] : null;
+    const cardTag = firstDoc ? `\n\n[IRIS_DOCUMENT_CARD:${JSON.stringify(firstDoc)}]` : '';
+    return JSON.stringify({
+      employeeName: user.displayName,
+      onboardingStatus: statusInfo.isFullySatisfied ? 'COMPLETE' : 'INCOMPLETE',
+      requirementsSatisfied: statusInfo.isFullySatisfied,
+      missingCount: statusInfo.missingCount,
+      reviewRequiredCount: statusInfo.reviewRequiredCount,
+      documents: statusInfo.documents
+    }, null, 2) + cardTag;
+  },
+
+  async analyzeEmployeeDocument({ documentId }, ctx) {
+    const { analyzeDocumentEvidence } = require('./irisDocumentAdapter');
+    const analysis = await analyzeDocumentEvidence(ctx.tenantId, documentId);
+    const cardTag = `\n\n[IRIS_DOCUMENT_CARD:${JSON.stringify(analysis)}]`;
+    return JSON.stringify(analysis, null, 2) + cardTag;
+  },
+
   async draftActionForApproval({ actionType, actionParameters, justification }, ctx) {
     // 0. Pre-emptive Validation
     if (ctx.roleLevel !== 0) {

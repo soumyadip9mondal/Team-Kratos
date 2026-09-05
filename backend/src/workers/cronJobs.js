@@ -1,5 +1,6 @@
 const cron = require('node-cron');
 const prisma = require('../config/db');
+const { withRetry } = prisma;
 const { gatherUserMetrics } = require('../utils/attritionMetrics');
 const { computeAttritionRisk } = require('../utils/attritionRiskEngine');
 const { computeColocationGraph } = require('../utils/colocationEngine');
@@ -171,6 +172,13 @@ const initCronJobs = () => {
       console.error('[CRON] Error in Metered Billing Counter:', error);
     }
   });
+
+  // 2.5 Communication Stress Test Retention Redaction (Runs daily at 3:00 AM)
+  cron.schedule('0 3 * * *', async () => {
+    console.log('[CRON] Running Communication Stress Test Retention Redaction...');
+    const { redactExpiredTests } = require('../jobs/redactExpiredCommunicationStressTests');
+    await redactExpiredTests(prisma.basePrisma);
+  });
   
   // 3. Leave Year Renewal (Runs daily at 1:00 AM)
   // Handles annual grant, carry-forward, and year-end lapse
@@ -300,49 +308,28 @@ const initCronJobs = () => {
     }
   });
 
-  // Cleanup Failsafe: Fix any existing Absent records with checkOut === null in DB
-  (async () => {
+  // Cleanup Failsafe: Deferred non-blocking background cleanup on server boot
+  // Delayed 10s so the DB warm-up ping has time to complete first
+  setTimeout(async () => {
     try {
-      const badRecords = await prisma.basePrisma.attendance.findMany({
+      const updatedAbsent = await withRetry(() => prisma.basePrisma.attendance.updateMany({
         where: { status: 'Absent', checkOut: null },
-        select: { id: true, checkIn: true }
-      });
-      for (const rec of badRecords) {
-        await prisma.basePrisma.attendance.update({
-          where: { id: rec.id },
-          data: { checkOut: rec.checkIn || new Date() }
-        });
-      }
-      if (badRecords.length > 0) {
-        console.log(`[CLEANUP] Fixed ${badRecords.length} system-generated Absent records with checkOut: null.`);
+        data: { checkOut: new Date() }
+      }));
+      if (updatedAbsent.count > 0) {
+        console.log(`[CLEANUP] Fixed ${updatedAbsent.count} system-generated Absent records with checkOut: null.`);
       }
 
-      // Cleanup Failsafe: Strip raw internal UUIDs from existing Announcement messages in DB
-      const uuidAnnouncements = await prisma.basePrisma.announcement.findMany({
-        where: { message: { contains: '(ID: ' } }
-      });
-      for (const ann of uuidAnnouncements) {
-        const cleanedMessage = ann.message.replace(/\(ID:\s*[a-f0-9\-]{36}\)/gi, '').replace(/\s+/g, ' ');
-        await prisma.basePrisma.announcement.update({
-          where: { id: ann.id },
-          data: { message: cleanedMessage }
-        });
-      }
-      if (uuidAnnouncements.length > 0) {
-        console.log(`[CLEANUP] Cleaned raw internal UUIDs from ${uuidAnnouncements.length} announcement records.`);
-      }
-
-      // Cleanup Failsafe: Delete sensitive OTP/password reset notifications from AppNotification inbox
-      const deletedSensitive = await prisma.basePrisma.appNotification.deleteMany({
+      const deletedSensitive = await withRetry(() => prisma.basePrisma.appNotification.deleteMany({
         where: { type: { in: ['OTP_VERIFICATION', 'PASSWORD_RESET', 'PASSWORD_CHANGED', 'NEW_ACCOUNT_CREDENTIALS'] } }
-      });
+      }));
       if (deletedSensitive.count > 0) {
         console.log(`[CLEANUP] Deleted ${deletedSensitive.count} sensitive security notifications from in-app inbox.`);
       }
     } catch (e) {
-      console.error('[CLEANUP] Failed to cleanup records:', e.message);
+      console.error('[CLEANUP] Deferred background cleanup error:', e.message);
     }
-  })();
+  }, 10000);
 
   console.log('[CRON] Background jobs initialized (10 scheduled).');
 };

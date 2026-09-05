@@ -175,10 +175,15 @@ export default function AIChatbot({ user }) {
     }
   };
 
-  const handleSendMessage = (prompt) => {
+  const handleSendMessage = (prompt, attachedFile = null) => {
     if (!prompt.trim() || isStreaming || !socket) return;
 
-    setMessages(prev => [...prev, { role: 'user', content: prompt, id: Date.now() }]);
+    setMessages(prev => [...prev, { 
+      role: 'user', 
+      content: prompt, 
+      attachedFile: attachedFile ? { name: attachedFile.name, type: attachedFile.type } : null,
+      id: Date.now() 
+    }]);
     setMessages(prev => [...prev, { role: 'model', content: '', id: 'thinking' }]);
     setIsStreaming(true);
     socket.emit('chatbot:query', { prompt, sessionId: currentSessionId });
@@ -238,7 +243,7 @@ export default function AIChatbot({ user }) {
               </div>
             </div>
           ) : (
-            <MessageList messages={messages} isStreaming={isStreaming} />
+            <MessageList messages={messages} isStreaming={isStreaming} onSendMessage={handleSendMessage} />
           )}
         </div>
 

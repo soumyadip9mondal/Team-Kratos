@@ -439,8 +439,57 @@ async function runChat(ctx, sessionId, prompt, io, socket, context = null) {
   megaPrompt += '\n';
 
 
+  // Attached document pre-fetch
+  let attachedDocContent = null;
+  let attachedFileName = null;
+  let cleanPrompt = prompt;
+
+  if (prompt.includes('[ATTACHED_FILE:')) {
+    const match = prompt.match(/\[ATTACHED_FILE:(.*?)\](?:\n(.*))?$/s);
+    if (match) {
+      attachedFileName = match[1];
+      cleanPrompt = match[2] || prompt;
+    }
+  }
+
+  if (attachedFileName) {
+    const docChunks = await prisma.basePrisma.hRDocument.findMany({
+      where: {
+        tenantId: ctx.tenantId,
+        title: attachedFileName
+      },
+      orderBy: { chunkIndex: 'asc' },
+      take: 20,
+      select: { content: true }
+    });
+
+    if (docChunks.length > 0) {
+      attachedDocContent = docChunks.map(c => c.content).join('\n\n');
+    }
+  }
+
+  if (!attachedDocContent) {
+    // Fallback: check if a document was uploaded in the last 15 minutes by this tenant
+    const recentDoc = await prisma.basePrisma.hRDocument.findFirst({
+      where: {
+        tenantId: ctx.tenantId,
+        createdAt: { gte: new Date(Date.now() - 15 * 60 * 1000) }
+      },
+      orderBy: { createdAt: 'desc' },
+      select: { title: true, content: true }
+    });
+    if (recentDoc) {
+      attachedFileName = recentDoc.title;
+      attachedDocContent = recentDoc.content;
+    }
+  }
+
   if (dbPreFetch) {
     megaPrompt += `[Pre-fetched Data]\n${JSON.stringify(dbPreFetch, null, 2)}\n\n`;
+  }
+
+  if (attachedDocContent) {
+    megaPrompt += `[Uploaded File Content: "${attachedFileName || 'Document'}"]\n${attachedDocContent}\n\n`;
   }
 
   if (ragContext) {
@@ -451,7 +500,7 @@ async function runChat(ctx, sessionId, prompt, io, socket, context = null) {
     megaPrompt += `[SYSTEM: INVISIBLE INVESTIGATION CONTEXT INJECTED]\n${JSON.stringify(context, null, 2)}\n\n`;
   }
 
-  megaPrompt += `User question: ${prompt}`;
+  megaPrompt += `User question: ${cleanPrompt}`;
 
   // ── 7. Single Gemini synthesis call ───────────────────────────────
   const history = await loadBoundedHistory(sessionId);

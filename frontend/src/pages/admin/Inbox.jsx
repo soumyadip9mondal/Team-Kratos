@@ -172,7 +172,7 @@ const Inbox = () => {
                   </button>
                 )}
                 <Link 
-                  to={item.actionUrl} 
+                  to={item.actionUrl && item.actionUrl !== '#' ? item.actionUrl : '/dashboard/engagement'} 
                   className="w-full sm:w-auto shrink-0 bg-[#F0F3F9] hover:bg-[#E2E8F0] text-[#1F2B4D] border border-[#CBD5E1] font-display font-bold text-[11px] md:text-xs px-3 md:px-4 py-2 rounded-xl transition-all hover:scale-[1.02] active:scale-95 shadow-xs flex items-center justify-center gap-1.5"
                 >
                   Review <ExternalLink size={14} />

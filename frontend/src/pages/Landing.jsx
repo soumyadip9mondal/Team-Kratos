@@ -65,7 +65,7 @@ const Landing = () => {
       >
         <div className="w-full px-6 md:px-12 h-20 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <img src="/Crew.png" alt="Crew HRMS Logo" className="h-16 w-auto object-contain drop-shadow-sm scale-110 origin-left" />
+            <img src="/crew-new.png" alt="Crew HRMS Logo" className="h-12 sm:h-14 w-auto object-contain drop-shadow-xs" />
           </div>
           <div className="hidden md:flex gap-4 items-center">
             <Link to="/login" className="text-sm font-display font-bold text-[#1F2B4D] hover:text-[#141C33] border border-[#EAE7E0] hover:border-[#CBD5E1] bg-white px-6 py-2.5 rounded-full transition-all duration-[500ms] ease-[cubic-bezier(0.32,0.72,0,1)] hover:shadow-xs active:scale-[0.97]">
@@ -305,7 +305,8 @@ const Landing = () => {
           >
             {/* Doppelrand CTA Block */}
             <div className="rounded-[2.5rem] bg-[#F4F1EA] border border-[#EAE7E0] p-2 shadow-[0_1px_2px_rgba(29,27,22,0.04),0_8px_20px_rgba(29,27,22,0.06)]">
-              <div className="rounded-[calc(2.5rem-0.5rem)] bg-white border border-[#EAE7E0]/50 shadow-[inset_0_1px_1px_rgba(255,255,255,0.6)] p-12 sm:p-20">
+              <div className="rounded-[calc(2.5rem-0.5rem)] bg-white border border-[#EAE7E0]/50 shadow-[inset_0_1px_1px_rgba(255,255,255,0.6)] p-12 sm:p-20 flex flex-col items-center">
+                <img src="/crew-new.png" alt="Crew HRMS Logo" className="h-10 sm:h-12 w-auto object-contain mb-6 drop-shadow-xs" />
                 <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-display font-bold uppercase tracking-[0.2em] text-[#6B655C] bg-[#FAF9F6] border border-[#EAE7E0] mb-8">
                   Get Started Today
                 </span>

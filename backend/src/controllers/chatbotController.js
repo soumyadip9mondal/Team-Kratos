@@ -167,12 +167,13 @@ exports.uploadDocument = async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: "No file provided." });
     const { title, type, category, accessLevel } = req.body;
-    if (!title || !type) return res.status(400).json({ error: "Title and type are required." });
+    const docTitle = req.file.originalname || title || "Uploaded Document";
+    const docType = type || "GENERAL";
 
     const result = await ingestDocument({
       tenantId: req.user.tenantId,
-      title,
-      type,
+      title: docTitle,
+      type: docType,
       category,
       buffer: req.file.buffer,
       mimeType: req.file.mimetype,
@@ -180,7 +181,7 @@ exports.uploadDocument = async (req, res) => {
       accessLevel
     });
 
-    res.json({ success: true, ...result });
+    res.json({ success: true, docTitle, ...result });
   } catch (error) {
     console.error("Document upload error:", error);
     res.status(500).json({ error: "An error occurred during document ingestion." });

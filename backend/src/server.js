@@ -64,6 +64,7 @@ app.use('/api/auth/', authLimiter);
 
 const jwt = require('jsonwebtoken');
 const prisma = require('./config/db');
+const { withRetry } = prisma;
 
 // Socket.io Connection Middleware (JWT Verification)
 io.use(async (socket, next) => {
@@ -79,10 +80,10 @@ io.use(async (socket, next) => {
     
     // Load the user and roleDefinition using basePrisma (outside tenantContext)
     const userId = decoded._id || decoded.id;
-    const user = await prisma.basePrisma.user.findUnique({
+    const user = await withRetry(() => prisma.basePrisma.user.findUnique({
       where: { id: userId },
       include: { roleDefinition: true }
-    });
+    }));
     
     if (!user) {
       return next(new Error('Authentication error: User not found'));
@@ -209,6 +210,7 @@ app.use('/api', require('./routes/rankingRoutes'));
 app.use('/api/intelligence', require('./routes/intelligenceRoutes'));
 app.use('/api/cost-intelligence', require('./routes/costIntelligenceRoutes'));
 app.use('/api/iris', require('./routes/irisRoutes'));
+app.use('/api/communication-stress-tests', require('./routes/communicationStressTests'));
 
 // Health check — lightweight keep-alive ping for Render / UptimeRobot
 // Safe to call every 10 minutes — does NOT run any DB logic
